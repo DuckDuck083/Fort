@@ -670,8 +670,11 @@
           removeFrom(crates, target);
         }
       } else {
-        const z = nearest(zombies, 52);
-        if (z) hitZombie(z, 1);
+        const z = nearest(zombies, 66);
+        if (z) {
+          hitZombie(z, 2);
+          message("Axe hit! It does close-range damage to zombies.", 1.2);
+        }
       }
     }
 
@@ -1043,6 +1046,10 @@
         addLog("Night falls. Zombies are coming.");
         message("Night wave incoming. Stay near camp and keep firing.", 4);
       }
+      if (oldPhase === "night" && phase() === "day") {
+        addLog("Sunrise weakens the remaining zombies.");
+        message("Daylight is making leftover zombies despawn.", 3);
+      }
     }
 
     function updateCombat(dt) {
@@ -1095,6 +1102,16 @@
       }
 
       for (const z of [...zombies]) {
+        if (phase() === "day") {
+          z.daylight = (z.daylight || 0) + dt;
+          z.hp -= dt * .55;
+          if (z.daylight > 9) {
+            spark(z.x, z.y, "#d9d18f", 10);
+            removeFrom(zombies, z);
+            continue;
+          }
+        }
+
         const target = Math.hypot(z.x - camp.x, z.y - camp.y) < 170 ? player : camp;
         const angle = Math.atan2(target.y - z.y, target.x - z.x);
         z.x += Math.cos(angle) * z.speed * dt;
@@ -1218,14 +1235,35 @@
     function drawCamp() {
       ctx.fillStyle = "rgba(117, 91, 54, .55)";
       circle(camp.x, camp.y, camp.r);
-      ctx.fillStyle = "#6f4b2f";
-      rect(table.x - 28, table.y - 16, 56, 32, 5);
-      ctx.fillStyle = "#b58a55";
-      rect(table.x - 22, table.y - 22, 44, 12, 4);
+      ctx.fillStyle = "#5d3f29";
+      rect(table.x - 34, table.y - 8, 68, 26, 4);
+      ctx.fillStyle = "#a87648";
+      rect(table.x - 38, table.y - 20, 76, 16, 3);
+      ctx.strokeStyle = "#d2a66c";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(table.x - 30, table.y - 12);
+      ctx.lineTo(table.x + 30, table.y - 12);
+      ctx.moveTo(table.x - 8, table.y - 20);
+      ctx.lineTo(table.x - 8, table.y - 4);
+      ctx.moveTo(table.x + 14, table.y - 20);
+      ctx.lineTo(table.x + 14, table.y - 4);
+      ctx.stroke();
+      ctx.fillStyle = "#4b3424";
+      rect(table.x - 30, table.y + 17, 8, 24, 2);
+      rect(table.x + 22, table.y + 17, 8, 24, 2);
+      ctx.strokeStyle = "#cfd5d0";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(table.x - 17, table.y - 26);
+      ctx.lineTo(table.x - 2, table.y - 12);
+      ctx.moveTo(table.x + 13, table.y - 24);
+      ctx.lineTo(table.x + 26, table.y - 15);
+      ctx.stroke();
       ctx.fillStyle = nearTable() ? "#f0d075" : "#d4c09a";
       ctx.font = "12px Segoe UI, Arial";
       ctx.textAlign = "center";
-      ctx.fillText("Craft", table.x, table.y - 29);
+      ctx.fillText("Workbench", table.x, table.y - 34);
 
       if (camp.barricade > 0) {
         ctx.strokeStyle = "#b78b51";
