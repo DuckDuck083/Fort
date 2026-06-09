@@ -97,6 +97,7 @@
     #healthFill { background: linear-gradient(90deg, #bd3939, #76d95b); }
     #ammoFill { background: linear-gradient(90deg, #406f9f, var(--blue)); }
     #staminaFill { background: linear-gradient(90deg, #a88737, var(--warn)); }
+    #hungerFill { background: linear-gradient(90deg, #8f512c, #e0a64b); }
 
     .clock {
       justify-self: center;
@@ -366,6 +367,7 @@
         <div class="bar-row"><b>Health</b><div class="bar"><div class="fill" id="healthFill"></div></div><span id="healthText">100</span></div>
         <div class="bar-row"><b>Ammo</b><div class="bar"><div class="fill" id="ammoFill"></div></div><span id="ammoText">12/36</span></div>
         <div class="bar-row"><b>Energy</b><div class="bar"><div class="fill" id="staminaFill"></div></div><span id="staminaText">100</span></div>
+        <div class="bar-row"><b>Hunger</b><div class="bar"><div class="fill" id="hungerFill"></div></div><span id="hungerText">100</span></div>
       </section>
 
       <section class="panel clock">
@@ -374,7 +376,7 @@
       </section>
 
       <section class="panel inventory">
-        <b>Pack</b>
+        <b>Sack</b>
         <div class="inv-grid" id="inventoryGrid"></div>
       </section>
     </div>
@@ -386,6 +388,8 @@
       <p><b>Axe:</b> chop trees/crates and melee zombies.</p>
       <p><b>Pistol:</b> shoot zombies or hunt animals. Press R to reload.</p>
       <p><b>Food/Med:</b> heal. Food also restores energy.</p>
+      <p><b>Raw food:</b> goes in your sack. Cook it at the fire with X.</p>
+      <p><b>Cooked food:</b> fills hunger and gives a small heal.</p>
       <p><b>Wood:</b> fuel the fire and build base parts.</p>
       <p><b>Scrap:</b> metal used for ammo, traps, rigs, and sentries.</p>
       <p><b>Fuel:</b> powers oil rigs and sentry guns.</p>
@@ -397,7 +401,7 @@
       <b>Crafting Table</b>
       <div class="recipe"><b>1 Wall:</b> 10 wood, 2 scrap. Blocks zombie bites at camp.</div>
       <div class="recipe"><b>2 Spike Trap:</b> 8 wood, 3 scrap. Hurts zombies near camp.</div>
-      <div class="recipe"><b>3 Food Generator:</b> 12 wood, 4 scrap, 2 food. Makes food each day.</div>
+      <div class="recipe"><b>3 Food Generator:</b> 12 wood, 4 scrap, 2 cooked food. Makes raw food each day.</div>
       <div class="recipe"><b>4 Oil Rig:</b> 8 wood, 8 scrap, 2 fuel. Makes fuel each day.</div>
       <div class="recipe"><b>5 Sentry Gun:</b> 18 scrap, 3 fuel, 12 coins. Shoots zombies.</div>
     </section>
@@ -406,7 +410,7 @@
       <section class="panel log" id="log"></section>
       <nav class="panel hotbar" id="hotbar" aria-label="Hotbar"></nav>
       <section class="panel craft">
-        <b>Quick craft:</b> C wall repair, V ammo, B med pack, F eat. E opens the crafting table when close. Traders buy gems, herbs, pelts, and spare wood.
+        <b>Quick craft:</b> C wall repair, V ammo, B med pack, F eat cooked food, X cook raw food, Q fuel fire. E opens the crafting table when close.
       </section>
     </div>
   </div>
@@ -428,9 +432,11 @@
       healthFill: document.getElementById("healthFill"),
       ammoFill: document.getElementById("ammoFill"),
       staminaFill: document.getElementById("staminaFill"),
+      hungerFill: document.getElementById("hungerFill"),
       healthText: document.getElementById("healthText"),
       ammoText: document.getElementById("ammoText"),
       staminaText: document.getElementById("staminaText"),
+      hungerText: document.getElementById("hungerText"),
       phaseText: document.getElementById("phaseText"),
       objectiveText: document.getElementById("objectiveText"),
       inventoryGrid: document.getElementById("inventoryGrid"),
@@ -471,13 +477,14 @@
       y: camp.y + 20,
       r: 17,
       health: 100,
+      hunger: 100,
       stamina: 100,
       speed: 250,
       tool: 0,
       ammo: 12,
       reserveAmmo: 36,
       coins: 5,
-      inv: { wood: 0, food: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
+      inv: { wood: 0, rawFood: 1, cookedFood: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
       builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 }
     };
 
@@ -535,9 +542,9 @@
     function currentTip() {
       if (state.buildOpen) return "Crafting table open: 1 wall, 2 trap, 3 food generator, 4 oil rig, 5 sentry gun.";
       if (nearTable()) return "Press E to open the crafting table.";
-      if (nearCampfire()) return "Campfire heals you. Press Q to spend 1 wood and fuel it.";
+      if (nearCampfire()) return "Campfire heals you. Q fuels it with wood. X cooks raw food into cooked food.";
       if (nearest(forage, 46)) return "Press E to forage berries or herbs.";
-      if (nearest(animals, 50)) return "Press E to hunt, or shoot animals for food and pelts.";
+      if (nearest(animals, 50)) return "Press E to hunt, or shoot animals for raw food and pelts.";
       if (nearest(traders, 62)) return "Press E to trade goods for coins or buy supplies.";
       if (nearest(crates, 58)) return "Use the axe on crates to find ammo, scrap metal, fuel, med packs, or gems.";
       if (nearest(trees, 58)) return "Use the axe on trees to gather wood.";
@@ -717,8 +724,8 @@
       const berry = nearest(forage, 46);
       if (berry) {
         if (berry.kind === "berries") {
-          player.inv.food += 1;
-          addLog("Foraged wild food.");
+          player.inv.rawFood += 1;
+          addLog("Foraged raw food.");
         } else {
           player.inv.herbs += 1;
           addLog("Picked healing herbs.");
@@ -730,7 +737,7 @@
 
       const animal = nearest(animals, 50);
       if (animal) {
-        player.inv.food += 2;
+        player.inv.rawFood += 2;
         player.inv.pelts += 1;
         removeFrom(animals, animal);
         addLog("Hunted small game.");
@@ -775,9 +782,9 @@
         if (player.coins >= 8) {
           player.coins -= 8;
           player.reserveAmmo += 12;
-          player.inv.food += 1;
+          player.inv.cookedFood += 1;
           trader.sold = true;
-          addLog("Bought ammo and food.");
+          addLog("Bought ammo and cooked food.");
         } else {
           message("Trader wants gems, herbs, pelts, wood, or 8 coins.");
         }
@@ -812,15 +819,16 @@
         } else message("Need 2 scrap to craft ammo.");
       }
       if (key === "KeyB") {
-        if (player.inv.herbs >= 2 && player.inv.food >= 1) {
+        if (player.inv.herbs >= 2 && player.inv.cookedFood >= 1) {
           player.inv.herbs -= 2;
-          player.inv.food -= 1;
+          player.inv.cookedFood -= 1;
           player.inv.med += 1;
           addLog("Crafted a med pack.");
-        } else message("Need 2 herbs and 1 food for a med pack.");
+        } else message("Need 2 herbs and 1 cooked food for a med pack.");
       }
       if (key === "KeyF") eatFood();
       if (key === "KeyQ") fuelFire();
+      if (key === "KeyX") cookFood();
     }
 
     function buildAtTable(slot) {
@@ -828,7 +836,7 @@
       const recipes = [
         { name: "wall", costs: { wood: 10, scrap: 2 }, make: () => { player.builds.walls++; camp.barricade += 55; } },
         { name: "spike trap", costs: { wood: 8, scrap: 3 }, make: () => player.builds.traps++ },
-        { name: "food generator", costs: { wood: 12, scrap: 4, food: 2 }, make: () => player.builds.foodGen++ },
+        { name: "food generator", costs: { wood: 12, scrap: 4, cookedFood: 2 }, make: () => player.builds.foodGen++ },
         { name: "oil rig", costs: { wood: 8, scrap: 8, fuel: 2 }, make: () => player.builds.oilRig++ },
         { name: "sentry gun", costs: { scrap: 18, fuel: 3, coins: 12 }, make: () => player.builds.sentry++ }
       ];
@@ -864,6 +872,25 @@
       addLog("Added wood to the fire.");
     }
 
+    function cookFood() {
+      if (!nearCampfire()) {
+        message("Stand near the campfire to cook raw food.");
+        return;
+      }
+      if (camp.fireFuel <= 5) {
+        message("The fire needs fuel before you can cook.");
+        return;
+      }
+      if (player.inv.rawFood <= 0) {
+        message("Need raw food in your sack.");
+        return;
+      }
+      player.inv.rawFood--;
+      player.inv.cookedFood++;
+      camp.fireFuel = Math.max(0, camp.fireFuel - 4);
+      addLog("Cooked raw food at the fire.");
+    }
+
     function useItem() {
       if (player.tool === 0) axeSwing();
       if (player.tool === 1) shoot();
@@ -880,11 +907,19 @@
     }
 
     function eatFood() {
-      if (player.inv.food <= 0 || player.health >= 100) return;
-      player.inv.food--;
-      player.health = Math.min(100, player.health + 16);
+      if (player.inv.cookedFood <= 0) {
+        message("No cooked food in your sack.");
+        return;
+      }
+      if (player.hunger >= 100 && player.health >= 100) {
+        message("You are already full.");
+        return;
+      }
+      player.inv.cookedFood--;
+      player.hunger = Math.min(100, player.hunger + 38);
+      player.health = Math.min(100, player.health + 10);
       player.stamina = Math.min(100, player.stamina + 24);
-      addLog("Ate food.");
+      addLog("Ate cooked food.");
     }
 
     function fireBomb() {
@@ -927,6 +962,8 @@
       state.messageTimer = Math.max(0, state.messageTimer - dt);
       if (state.messageTimer <= 0) ui.tip.textContent = currentTip();
       state.buildOpen = state.buildOpen && nearTable();
+      player.hunger = Math.max(0, player.hunger - dt * (phase() === "night" ? 1.05 : .72));
+      if (player.hunger <= 0) player.health -= 4.5 * dt;
 
       const oldDay = state.day;
       state.day = 1 + Math.floor(state.time / 120);
@@ -934,9 +971,9 @@
         spawnResources();
         const madeFood = player.builds.foodGen * 2;
         const madeFuel = player.builds.oilRig * 2;
-        player.inv.food += madeFood;
+        player.inv.rawFood += madeFood;
         player.inv.fuel += madeFuel;
-        if (madeFood || madeFuel) addLog(`Machines produced ${madeFood} food and ${madeFuel} fuel.`);
+        if (madeFood || madeFuel) addLog(`Machines produced ${madeFood} raw food and ${madeFuel} fuel.`);
         addLog(`Day ${state.day} begins. The woods restocked.`);
       }
 
@@ -960,7 +997,7 @@
       player.x = clamp(player.x + dx / len * speed * dt, 18, world.w - 18);
       player.y = clamp(player.y + dy / len * speed * dt, 18, world.h - 18);
       if (sprint && (dx || dy)) player.stamina = Math.max(0, player.stamina - 22 * dt);
-      else player.stamina = Math.min(100, player.stamina + 12 * dt);
+      else player.stamina = Math.min(100, player.stamina + (player.hunger <= 0 ? 3 : 12) * dt);
 
       if (nearCampfire()) player.health = Math.min(100, player.health + 8 * dt);
     }
@@ -1046,7 +1083,7 @@
         }
         for (const a of [...animals]) {
           if (Math.hypot(b.x - a.x, b.y - a.y) < a.r + 4) {
-            player.inv.food += 2;
+            player.inv.rawFood += 2;
             player.inv.pelts += 1;
             removeFrom(animals, a);
             b.life = 0;
@@ -1107,9 +1144,11 @@
     function updateUi() {
       ui.healthFill.style.width = `${player.health}%`;
       ui.staminaFill.style.width = `${player.stamina}%`;
+      ui.hungerFill.style.width = `${player.hunger}%`;
       ui.ammoFill.style.width = `${player.ammo / 12 * 100}%`;
       ui.healthText.textContent = Math.ceil(player.health);
       ui.staminaText.textContent = Math.ceil(player.stamina);
+      ui.hungerText.textContent = Math.ceil(player.hunger);
       ui.ammoText.textContent = `${player.ammo}/${player.reserveAmmo}`;
       ui.phaseText.textContent = `Day ${state.day} - ${phaseName()}`;
       ui.objectiveText.textContent = phase() === "day"
@@ -1118,7 +1157,8 @@
 
       const inv = [
         ["Wood", player.inv.wood],
-        ["Food", player.inv.food],
+        ["Raw", player.inv.rawFood],
+        ["Cooked", player.inv.cookedFood],
         ["Herbs", player.inv.herbs],
         ["Scrap", player.inv.scrap],
         ["Fuel", player.inv.fuel],
@@ -1137,7 +1177,7 @@
       ui.hotbar.innerHTML = tools.map((tool, i) => {
         let count = "";
         if (tool.id === "med") count = player.inv.med;
-        if (tool.id === "food") count = player.inv.food;
+        if (tool.id === "food") count = player.inv.cookedFood;
         if (tool.id === "flare") count = tool.count;
         return `<button class="slot ${player.tool === i ? "active" : ""}" data-slot="${i}" title="${tool.name}">
           <small>${i + 1}</small>${tool.icon}<span>${count}</span>
@@ -1376,12 +1416,13 @@
         x: camp.x + 38,
         y: camp.y + 20,
         health: 100,
+        hunger: 100,
         stamina: 100,
         tool: 0,
         ammo: 12,
         reserveAmmo: 36,
         coins: 5,
-        inv: { wood: 0, food: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
+        inv: { wood: 0, rawFood: 1, cookedFood: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
         builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 }
       });
       Object.assign(state, {
