@@ -261,6 +261,78 @@
       display: block;
     }
 
+    .trade-menu {
+      position: fixed;
+      right: 14px;
+      top: 150px;
+      width: min(390px, calc(100vw - 28px));
+      padding: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.36;
+      pointer-events: auto;
+      display: none;
+    }
+
+    .trade-menu.open {
+      display: block;
+    }
+
+    .trade-menu h2 {
+      margin: 0 0 8px;
+      color: var(--text);
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    .trade-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 0;
+      border-top: 1px solid rgba(255, 255, 255, .12);
+    }
+
+    .trade-row button {
+      border: 0;
+      border-radius: 6px;
+      padding: 7px 9px;
+      background: var(--warn);
+      color: #211a08;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .notices {
+      position: fixed;
+      left: 50%;
+      top: 92px;
+      transform: translateX(-50%);
+      display: grid;
+      gap: 6px;
+      width: min(420px, calc(100vw - 28px));
+      pointer-events: none;
+    }
+
+    .notice {
+      justify-self: center;
+      max-width: 100%;
+      padding: 7px 11px;
+      border: 1px solid rgba(255, 255, 255, .18);
+      border-radius: 7px;
+      background: rgba(28, 30, 24, .88);
+      color: var(--text);
+      font-size: 13px;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, .25);
+      animation: noticeIn .18s ease-out;
+    }
+
+    @keyframes noticeIn {
+      from { transform: translateY(-6px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
     .recipe {
       margin-top: 7px;
       padding-top: 7px;
@@ -347,6 +419,14 @@
         width: auto;
       }
 
+      .trade-menu {
+        left: 8px;
+        right: 8px;
+        top: auto;
+        bottom: 78px;
+        width: auto;
+      }
+
       .hotbar {
         justify-self: center;
       }
@@ -406,6 +486,13 @@
       <div class="recipe"><b>5 Sentry Gun:</b> 18 scrap, 3 fuel, 12 coins. Shoots zombies.</div>
     </section>
 
+    <section class="panel trade-menu" id="tradeMenu">
+      <h2>Wandering Trader</h2>
+      <div id="tradeRows"></div>
+    </section>
+
+    <div class="notices" id="notices"></div>
+
     <div class="bottom">
       <section class="panel log" id="log"></section>
       <nav class="panel hotbar" id="hotbar" aria-label="Hotbar"></nav>
@@ -443,7 +530,10 @@
       hotbar: document.getElementById("hotbar"),
       tip: document.getElementById("tip"),
       log: document.getElementById("log"),
+      notices: document.getElementById("notices"),
       buildMenu: document.getElementById("buildMenu"),
+      tradeMenu: document.getElementById("tradeMenu"),
+      tradeRows: document.getElementById("tradeRows"),
       startScreen: document.getElementById("startScreen"),
       startBtn: document.getElementById("startBtn")
     };
@@ -465,11 +555,17 @@
       spawnTimer: 0,
       traderTimer: 18,
       buildOpen: false,
+      tradeOpen: false,
+      activeTrader: null,
       generatorTimer: 20,
       sentryTimer: 0,
+      cooking: false,
+      cookingTimer: 0,
+      cookingTotal: 2.8,
       messageTimer: 0,
       message: "Stay close to the campfire to heal.",
-      logs: ["Welcome to the woods."]
+      logs: ["Welcome to the woods."],
+      notices: []
     };
 
     const player = {
@@ -531,6 +627,19 @@
       state.logs.unshift(text);
       state.logs = state.logs.slice(0, 4);
       ui.log.innerHTML = state.logs.map((line, i) => i === 0 ? `<b>${line}</b>` : line).join("<br>");
+      notify(text);
+    }
+
+    function notify(text) {
+      state.notices.unshift({ text, time: 2.6 });
+      state.notices = state.notices.slice(0, 4);
+      renderNotices();
+    }
+
+    function renderNotices() {
+      ui.notices.innerHTML = state.notices
+        .map(n => `<div class="notice">${n.text}</div>`)
+        .join("");
     }
 
     function message(text, seconds = 2.2) {
@@ -541,11 +650,14 @@
 
     function currentTip() {
       if (state.buildOpen) return "Crafting table open: 1 wall, 2 trap, 3 food generator, 4 oil rig, 5 sentry gun.";
+      if (state.tradeOpen) return "Trader shop open. Use the buttons to buy or sell, or press E to close.";
       if (nearTable()) return "Press E to open the crafting table.";
+      if (nearCampfire() && state.cooking) return "Cooking raw meat...";
+      if (nearCampfire() && player.inv.rawFood > 0) return "You have raw meat in your sack. Press X to cook it at the fire.";
       if (nearCampfire()) return "Campfire heals you. Q fuels it with wood. X cooks raw food into cooked food.";
       if (nearest(forage, 46)) return "Press E to forage berries or herbs.";
       if (nearest(animals, 50)) return "Press E to hunt, or shoot animals for raw food and pelts.";
-      if (nearest(traders, 62)) return "Press E to trade goods for coins or buy supplies.";
+      if (nearest(traders, 62)) return "Press E to open the wandering trader shop.";
       if (nearest(crates, 58)) return "Use the axe on crates to find ammo, scrap metal, fuel, med packs, or gems.";
       if (nearest(trees, 58)) return "Use the axe on trees to gather wood.";
       return "WASD move. Click to use equipped item. E interacts. 1-5 swaps tools. Q fuels fire.";
@@ -661,9 +773,10 @@
         target.hp--;
         spark(target.x, target.y, target.hp <= 0 ? "#dca95a" : "#f0d095", 8);
         if (trees.includes(target) && target.hp <= 0) {
-          player.inv.wood += Math.floor(rand(2, 5));
+          const wood = Math.floor(rand(2, 5));
+          player.inv.wood += wood;
           removeFrom(trees, target);
-          addLog("Chopped wood.");
+          addLog(`Picked up ${wood} wood.`);
         }
         if (crates.includes(target) && target.hp <= 0) {
           lootCrate(target);
@@ -728,7 +841,7 @@
       if (berry) {
         if (berry.kind === "berries") {
           player.inv.rawFood += 1;
-          addLog("Foraged raw food.");
+          addLog("Picked up wild food.");
         } else {
           player.inv.herbs += 1;
           addLog("Picked healing herbs.");
@@ -743,65 +856,80 @@
         player.inv.rawFood += 2;
         player.inv.pelts += 1;
         removeFrom(animals, animal);
-        addLog("Hunted small game.");
+        addLog("Collected raw meat.");
         spark(animal.x, animal.y, "#e5bf80", 10);
         return;
       }
 
       const trader = nearest(traders, 62);
       if (trader) {
-        trade(trader);
+        toggleTrade(trader);
         return;
       }
 
       message("Nothing close enough to interact with.");
     }
 
-    function trade(trader) {
-      if (trader.sold) {
-        message("The trader is already packing up.");
-        return;
-      }
-      let coins = 0;
-      if (player.inv.gems > 0) {
-        coins += player.inv.gems * 12;
-        player.inv.gems = 0;
-      }
-      if (player.inv.pelts > 0) {
-        coins += player.inv.pelts * 5;
-        player.inv.pelts = 0;
-      }
-      if (player.inv.herbs >= 2) {
-        const bundles = Math.floor(player.inv.herbs / 2);
-        coins += bundles * 4;
-        player.inv.herbs -= bundles * 2;
-      }
-      if (player.inv.wood >= 5) {
-        const bundles = Math.floor(player.inv.wood / 5);
-        coins += bundles * 3;
-        player.inv.wood -= bundles * 5;
-      }
-      if (coins === 0) {
-        if (player.coins >= 8) {
-          player.coins -= 8;
-          player.reserveAmmo += 12;
-          player.inv.cookedFood += 1;
-          trader.sold = true;
-          addLog("Bought ammo and cooked food.");
-        } else {
-          message("Trader wants gems, herbs, pelts, wood, or 8 coins.");
+    function toggleTrade(trader) {
+      state.tradeOpen = !state.tradeOpen || state.activeTrader !== trader;
+      state.activeTrader = state.tradeOpen ? trader : null;
+      state.buildOpen = false;
+      renderTrade();
+      message(state.tradeOpen ? "Trader shop opened." : "Trader shop closed.");
+    }
+
+    function renderTrade() {
+      ui.tradeMenu.classList.toggle("open", state.tradeOpen);
+      if (!state.tradeOpen) return;
+      const summary = `<div class="trade-row"><span><b>Your sack:</b><br>${player.coins} coins, ${player.inv.gems} gems, ${player.inv.pelts} pelts, ${player.inv.herbs} herbs, ${player.inv.wood} wood, ${player.inv.scrap} scrap</span></div>`;
+      const rows = [
+        ["buy-ammo", "Buy 12 ammo", "8 coins"],
+        ["buy-food", "Buy 2 cooked food", "6 coins"],
+        ["buy-med", "Buy 1 med pack", "10 coins"],
+        ["buy-fuel", "Buy 3 fuel", "9 coins"],
+        ["sell-gem", "Sell 1 gem", "+12 coins"],
+        ["sell-pelt", "Sell 1 pelt", "+5 coins"],
+        ["sell-herbs", "Sell 2 herbs", "+4 coins"],
+        ["sell-wood", "Sell 5 wood", "+3 coins"],
+        ["sell-scrap", "Sell 3 scrap", "+5 coins"]
+      ];
+      ui.tradeRows.innerHTML = summary + rows.map(([id, label, price]) => `
+        <div class="trade-row">
+          <span><b>${label}</b><br>${price}</span>
+          <button data-trade="${id}">Trade</button>
+        </div>
+      `).join("");
+    }
+
+    function doTrade(id) {
+      if (!state.tradeOpen) return;
+      const buy = (cost, action, label) => {
+        if (player.coins < cost) {
+          message(`Need ${cost} coins.`);
+          return;
         }
-        return;
-      }
-      player.coins += coins;
-      if (player.coins >= 10 && player.inv.med < 3) {
-        player.coins -= 10;
-        player.inv.med += 1;
-        addLog(`Sold goods for ${coins} coins and bought a med pack.`);
-      } else {
-        addLog(`Sold goods for ${coins} coins.`);
-      }
-      trader.sold = true;
+        player.coins -= cost;
+        action();
+        addLog(label);
+      };
+      const sell = (item, amount, coins, label) => {
+        if (player.inv[item] < amount) {
+          message(`Need ${amount} ${item}.`);
+          return;
+        }
+        player.inv[item] -= amount;
+        player.coins += coins;
+        addLog(label);
+      };
+      if (id === "buy-ammo") buy(8, () => player.reserveAmmo += 12, "Bought 12 ammo.");
+      if (id === "buy-food") buy(6, () => player.inv.cookedFood += 2, "Bought cooked food.");
+      if (id === "buy-med") buy(10, () => player.inv.med += 1, "Bought a med pack.");
+      if (id === "buy-fuel") buy(9, () => player.inv.fuel += 3, "Bought fuel.");
+      if (id === "sell-gem") sell("gems", 1, 12, "Sold a gem.");
+      if (id === "sell-pelt") sell("pelts", 1, 5, "Sold a pelt.");
+      if (id === "sell-herbs") sell("herbs", 2, 4, "Sold herbs.");
+      if (id === "sell-wood") sell("wood", 5, 3, "Sold wood.");
+      if (id === "sell-scrap") sell("scrap", 3, 5, "Sold scrap metal.");
     }
 
     function craft(key) {
@@ -876,6 +1004,10 @@
     }
 
     function cookFood() {
+      if (state.cooking) {
+        message("Already cooking raw meat.");
+        return;
+      }
       if (!nearCampfire()) {
         message("Stand near the campfire to cook raw food.");
         return;
@@ -888,10 +1020,23 @@
         message("Need raw food in your sack.");
         return;
       }
+      state.cooking = true;
+      state.cookingTimer = state.cookingTotal;
+      message("Cooking raw meat...", 1.2);
+      addLog("Started cooking raw meat.");
+    }
+
+    function finishCooking() {
+      if (player.inv.rawFood <= 0) {
+        state.cooking = false;
+        message("No raw meat left to cook.");
+        return;
+      }
       player.inv.rawFood--;
       player.inv.cookedFood++;
       camp.fireFuel = Math.max(0, camp.fireFuel - 4);
-      addLog("Cooked raw food at the fire.");
+      state.cooking = false;
+      addLog("Cooked raw meat.");
     }
 
     function useItem() {
@@ -940,8 +1085,9 @@
     function hitZombie(z, damage) {
       z.hp -= damage;
       spark(z.x, z.y, "#8fcf6d", 8);
-      if (z.hp <= 0) {
-        removeFrom(zombies, z);
+        if (z.hp <= 0) {
+          removeFrom(zombies, z);
+        addLog("Killed zombie.");
         player.coins += Math.random() < .3 ? 1 : 0;
         if (Math.random() < .12) player.reserveAmmo += 3;
         if (Math.random() < .08) tools[4].count++;
@@ -963,8 +1109,29 @@
       state.shootTimer = Math.max(0, state.shootTimer - dt);
       state.swingTimer = Math.max(0, state.swingTimer - dt);
       state.messageTimer = Math.max(0, state.messageTimer - dt);
+      for (const notice of state.notices) notice.time -= dt;
+      const oldNoticeCount = state.notices.length;
+      state.notices = state.notices.filter(n => n.time > 0);
+      if (oldNoticeCount !== state.notices.length) renderNotices();
       if (state.messageTimer <= 0) ui.tip.textContent = currentTip();
       state.buildOpen = state.buildOpen && nearTable();
+      if (state.tradeOpen && (!state.activeTrader || dist(player, state.activeTrader) > 82)) {
+        state.tradeOpen = false;
+        state.activeTrader = null;
+        renderTrade();
+      }
+      if (state.cooking) {
+        state.cookingTimer = Math.max(0, state.cookingTimer - dt);
+        if (!nearCampfire()) {
+          state.cooking = false;
+          message("Cooking stopped because you left the fire.");
+        } else if (camp.fireFuel <= 2) {
+          state.cooking = false;
+          message("Cooking stopped because the fire needs fuel.");
+        } else if (state.cookingTimer <= 0) {
+          finishCooking();
+        }
+      }
       player.hunger = Math.max(0, player.hunger - dt * (phase() === "night" ? 1.05 : .72));
       if (player.hunger <= 0) player.health -= 4.5 * dt;
 
@@ -1094,7 +1261,7 @@
             player.inv.pelts += 1;
             removeFrom(animals, a);
             b.life = 0;
-            addLog("Hunted game with the pistol.");
+            addLog("Collected raw meat.");
             break;
           }
         }
@@ -1187,6 +1354,7 @@
       ];
       ui.inventoryGrid.innerHTML = inv.map(([k, v]) => `<div class="inv-item"><span>${k}</span><b>${v}</b></div>`).join("");
       ui.buildMenu.classList.toggle("open", state.buildOpen);
+      renderTrade();
       renderHotbar();
     }
 
@@ -1290,6 +1458,20 @@
       ctx.restore();
       ctx.fillStyle = "#ffd367";
       circle(camp.x, camp.y - 4, 16 + pulse * .15);
+      if (state.cooking) {
+        const progress = 1 - state.cookingTimer / state.cookingTotal;
+        ctx.fillStyle = "#d7a35b";
+        circle(camp.x + 38, camp.y - 12, 11 + Math.sin(performance.now() / 90) * 1.5);
+        ctx.strokeStyle = "#f4e3a4";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(camp.x + 38, camp.y - 12, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+        ctx.stroke();
+        ctx.fillStyle = "#f6f1df";
+        ctx.font = "12px Segoe UI, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(`${Math.ceil(state.cookingTimer)}s`, camp.x + 38, camp.y - 34);
+      }
 
       drawBuilds();
     }
@@ -1375,6 +1557,10 @@
         circle(trader.x, trader.y, trader.r);
         ctx.fillStyle = "#303036";
         rect(trader.x - 14, trader.y + 7, 28, 18, 4);
+        ctx.fillStyle = "#f6f1df";
+        ctx.font = "12px Segoe UI, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Trader", trader.x, trader.y - 26);
       }
       for (const a of animals) {
         ctx.fillStyle = "#b79668";
@@ -1474,11 +1660,16 @@
         spawnTimer: 0,
         traderTimer: 18,
         buildOpen: false,
+        tradeOpen: false,
+        activeTrader: null,
         generatorTimer: 20,
         sentryTimer: 0,
+        cooking: false,
+        cookingTimer: 0,
         messageTimer: 3,
         message: "Stay close to the campfire to heal.",
-        logs: ["Welcome to the woods."]
+        logs: ["Welcome to the woods."],
+        notices: []
       });
       camp.barricade = 0;
       camp.fireFuel = 70;
@@ -1491,6 +1682,8 @@
       tools[4].count = 0;
       spawnResources();
       addLog("Day 1 begins.");
+      renderNotices();
+      renderTrade();
       ui.startScreen.style.display = "none";
       updateUi();
     }
@@ -1519,6 +1712,10 @@
     ui.hotbar.addEventListener("click", (e) => {
       const slot = e.target.closest(".slot");
       if (slot) player.tool = Number(slot.dataset.slot);
+    });
+    ui.tradeRows.addEventListener("click", (e) => {
+      const button = e.target.closest("[data-trade]");
+      if (button) doTrade(button.dataset.trade);
     });
     ui.startBtn.addEventListener("click", reset);
 
