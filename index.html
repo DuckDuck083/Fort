@@ -261,7 +261,8 @@
       display: block;
     }
 
-    .trade-menu {
+    .trade-menu,
+    .chest-menu {
       position: fixed;
       right: 14px;
       top: 150px;
@@ -274,18 +275,21 @@
       display: none;
     }
 
-    .trade-menu.open {
+    .trade-menu.open,
+    .chest-menu.open {
       display: block;
     }
 
-    .trade-menu h2 {
+    .trade-menu h2,
+    .chest-menu h2 {
       margin: 0 0 8px;
       color: var(--text);
       font-size: 16px;
       letter-spacing: 0;
     }
 
-    .trade-row {
+    .trade-row,
+    .chest-row {
       display: grid;
       grid-template-columns: 1fr auto;
       align-items: center;
@@ -294,7 +298,8 @@
       border-top: 1px solid rgba(255, 255, 255, .12);
     }
 
-    .trade-row button {
+    .trade-row button,
+    .chest-row button {
       border: 0;
       border-radius: 6px;
       padding: 7px 9px;
@@ -419,7 +424,8 @@
         width: auto;
       }
 
-      .trade-menu {
+      .trade-menu,
+      .chest-menu {
         left: 8px;
         right: 8px;
         top: auto;
@@ -484,11 +490,17 @@
       <div class="recipe"><b>3 Food Generator:</b> 12 wood, 4 scrap, 2 cooked food. Makes raw food each day.</div>
       <div class="recipe"><b>4 Oil Rig:</b> 8 wood, 8 scrap, 2 fuel. Makes fuel each day.</div>
       <div class="recipe"><b>5 Sentry Gun:</b> 18 scrap, 3 fuel, 12 coins. Shoots zombies.</div>
+      <div class="recipe"><b>6 Chest:</b> 12 wood, 2 scrap. Stores sack items at camp.</div>
     </section>
 
     <section class="panel trade-menu" id="tradeMenu">
       <h2>Wandering Trader</h2>
       <div id="tradeRows"></div>
+    </section>
+
+    <section class="panel chest-menu" id="chestMenu">
+      <h2>Storage Chest</h2>
+      <div id="chestRows"></div>
     </section>
 
     <div class="notices" id="notices"></div>
@@ -506,7 +518,7 @@
     <div class="screen-card">
       <h1>Last Campfire</h1>
       <p>Build up your camp by day. Hold the fire line by night.</p>
-      <p>Use the guide on the left for every item. Open the crafting table at camp to build walls, traps, generators, oil rigs, and sentry guns.</p>
+      <p>Use the guide on the left for every item. You start with one chest, and the workbench can build more storage, walls, traps, generators, oil rigs, and sentry guns.</p>
       <button id="startBtn">Start Survival</button>
     </div>
   </div>
@@ -534,6 +546,8 @@
       buildMenu: document.getElementById("buildMenu"),
       tradeMenu: document.getElementById("tradeMenu"),
       tradeRows: document.getElementById("tradeRows"),
+      chestMenu: document.getElementById("chestMenu"),
+      chestRows: document.getElementById("chestRows"),
       startScreen: document.getElementById("startScreen"),
       startBtn: document.getElementById("startBtn")
     };
@@ -557,6 +571,8 @@
       buildOpen: false,
       tradeOpen: false,
       activeTrader: null,
+      chestOpen: false,
+      activeChest: null,
       generatorTimer: 20,
       sentryTimer: 0,
       cooking: false,
@@ -600,6 +616,7 @@
     const bullets = [];
     const drops = [];
     const traders = [];
+    const chests = [];
     const particles = [];
 
     function rand(min, max) {
@@ -649,9 +666,11 @@
     }
 
     function currentTip() {
-      if (state.buildOpen) return "Crafting table open: 1 wall, 2 trap, 3 food generator, 4 oil rig, 5 sentry gun.";
+      if (state.buildOpen) return "Crafting table open: 1 wall, 2 trap, 3 food generator, 4 oil rig, 5 sentry gun, 6 chest.";
       if (state.tradeOpen) return "Trader shop open. Use the buttons to buy or sell, or press E to close.";
+      if (state.chestOpen) return "Chest open. Use the buttons to deposit or withdraw sack items.";
       if (nearTable()) return "Press E to open the crafting table.";
+      if (nearest(chests, 58)) return "Press E to open this storage chest.";
       if (nearCampfire() && state.cooking) return "Cooking raw meat...";
       if (nearCampfire() && player.inv.rawFood > 0) return "You have raw meat in your sack. Press X to cook it at the fire.";
       if (nearCampfire()) return "Campfire heals you. Q fuels it with wood. X cooks raw food into cooked food.";
@@ -697,7 +716,7 @@
         const p = randomFarPoint(155);
         forage.push({ ...p, r: 12, kind: Math.random() < .55 ? "berries" : "herbs" });
       }
-      for (let i = 0; i < 18; i++) {
+      for (let i = 0; i < 28; i++) {
         const p = randomFarPoint(280);
         crates.push({ ...p, r: 16, hp: 2 });
       }
@@ -793,16 +812,17 @@
 
     function lootCrate(crate) {
       const roll = Math.random();
-      if (roll < .25) {
+      if (roll < .2) {
         player.reserveAmmo += 8;
         addLog("Found pistol ammo.");
-      } else if (roll < .5) {
-        player.inv.scrap += 3;
-        addLog("Found scrap metal.");
-      } else if (roll < .68) {
+      } else if (roll < .6) {
+        const scrap = Math.floor(rand(4, 8));
+        player.inv.scrap += scrap;
+        addLog(`Found ${scrap} scrap metal.`);
+      } else if (roll < .76) {
         player.inv.fuel += 2;
         addLog("Found fuel cans.");
-      } else if (roll < .84) {
+      } else if (roll < .9) {
         player.inv.med += 1;
         addLog("Found a med pack.");
       } else {
@@ -831,9 +851,18 @@
     }
 
     function interact() {
+      const chest = nearest(chests, 58);
+      if (chest) {
+        toggleChest(chest);
+        return;
+      }
+
       if (nearTable()) {
         state.buildOpen = !state.buildOpen;
-        message(state.buildOpen ? "Crafting table open. Press 1-5 to build." : "Crafting table closed.");
+        state.tradeOpen = false;
+        state.chestOpen = false;
+        state.activeChest = null;
+        message(state.buildOpen ? "Crafting table open. Press 1-6 to build." : "Crafting table closed.");
         return;
       }
 
@@ -874,6 +903,9 @@
       state.tradeOpen = !state.tradeOpen || state.activeTrader !== trader;
       state.activeTrader = state.tradeOpen ? trader : null;
       state.buildOpen = false;
+      state.chestOpen = false;
+      state.activeChest = null;
+      renderChest();
       renderTrade();
       message(state.tradeOpen ? "Trader shop opened." : "Trader shop closed.");
     }
@@ -932,6 +964,69 @@
       if (id === "sell-scrap") sell("scrap", 3, 5, "Sold scrap metal.");
     }
 
+    function blankStorage() {
+      return { wood: 0, rawFood: 0, cookedFood: 0, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 0, pelts: 0 };
+    }
+
+    function toggleChest(chest) {
+      state.chestOpen = !state.chestOpen || state.activeChest !== chest;
+      state.activeChest = state.chestOpen ? chest : null;
+      state.buildOpen = false;
+      state.tradeOpen = false;
+      state.activeTrader = null;
+      renderTrade();
+      renderChest();
+      message(state.chestOpen ? "Storage chest opened." : "Storage chest closed.");
+    }
+
+    function renderChest() {
+      ui.chestMenu.classList.toggle("open", state.chestOpen);
+      if (!state.chestOpen || !state.activeChest) return;
+      const labels = {
+        wood: "Wood",
+        rawFood: "Raw meat",
+        cookedFood: "Cooked food",
+        herbs: "Herbs",
+        scrap: "Scrap",
+        fuel: "Fuel",
+        gems: "Gems",
+        med: "Med packs",
+        pelts: "Pelts"
+      };
+      ui.chestRows.innerHTML = Object.keys(labels).map(item => `
+        <div class="chest-row">
+          <span><b>${labels[item]}</b><br>Sack: ${player.inv[item]} | Chest: ${state.activeChest.inv[item]}</span>
+          <span>
+            <button data-chest="deposit:${item}">Store</button>
+            <button data-chest="withdraw:${item}">Take</button>
+          </span>
+        </div>
+      `).join("");
+    }
+
+    function moveChestItem(action, item) {
+      if (!state.chestOpen || !state.activeChest) return;
+      if (action === "deposit") {
+        if (player.inv[item] <= 0) {
+          message(`No ${item} in your sack.`);
+          return;
+        }
+        player.inv[item]--;
+        state.activeChest.inv[item]++;
+        addLog("Stored item in chest.");
+      }
+      if (action === "withdraw") {
+        if (state.activeChest.inv[item] <= 0) {
+          message(`No ${item} in this chest.`);
+          return;
+        }
+        state.activeChest.inv[item]--;
+        player.inv[item]++;
+        addLog("Took item from chest.");
+      }
+      renderChest();
+    }
+
     function craft(key) {
       if (key === "KeyC") {
         if (player.inv.wood >= 8 && player.inv.scrap >= 2) {
@@ -969,7 +1064,8 @@
         { name: "spike trap", costs: { wood: 8, scrap: 3 }, make: () => player.builds.traps++ },
         { name: "food generator", costs: { wood: 12, scrap: 4, cookedFood: 2 }, make: () => player.builds.foodGen++ },
         { name: "oil rig", costs: { wood: 8, scrap: 8, fuel: 2 }, make: () => player.builds.oilRig++ },
-        { name: "sentry gun", costs: { scrap: 18, fuel: 3, coins: 12 }, make: () => player.builds.sentry++ }
+        { name: "sentry gun", costs: { scrap: 18, fuel: 3, coins: 12 }, make: () => player.builds.sentry++ },
+        { name: "storage chest", costs: { wood: 12, scrap: 2 }, make: () => createChest() }
       ];
       const recipe = recipes[slot];
       if (!recipe) return true;
@@ -987,6 +1083,17 @@
       recipe.make();
       addLog(`Built ${recipe.name}.`);
       return true;
+    }
+
+    function createChest() {
+      const i = chests.length;
+      const angle = -Math.PI * .82 + i * .42;
+      chests.push({
+        x: camp.x + Math.cos(angle) * 118,
+        y: camp.y + Math.sin(angle) * 118,
+        r: 22,
+        inv: blankStorage()
+      });
     }
 
     function fuelFire() {
@@ -1089,6 +1196,7 @@
           removeFrom(zombies, z);
         addLog("Killed zombie.");
         player.coins += Math.random() < .3 ? 1 : 0;
+        if (Math.random() < .45) player.inv.scrap += 1;
         if (Math.random() < .12) player.reserveAmmo += 3;
         if (Math.random() < .08) tools[4].count++;
       }
@@ -1119,6 +1227,11 @@
         state.tradeOpen = false;
         state.activeTrader = null;
         renderTrade();
+      }
+      if (state.chestOpen && (!state.activeChest || dist(player, state.activeChest) > 82)) {
+        state.chestOpen = false;
+        state.activeChest = null;
+        renderChest();
       }
       if (state.cooking) {
         state.cookingTimer = Math.max(0, state.cookingTimer - dt);
@@ -1350,11 +1463,13 @@
         ["Meds", player.inv.med],
         ["Pelts", player.inv.pelts],
         ["Coins", player.coins],
+        ["Chests", chests.length],
         ["Fire", Math.floor(camp.fireFuel)]
       ];
       ui.inventoryGrid.innerHTML = inv.map(([k, v]) => `<div class="inv-item"><span>${k}</span><b>${v}</b></div>`).join("");
       ui.buildMenu.classList.toggle("open", state.buildOpen);
       renderTrade();
+      renderChest();
       renderHotbar();
     }
 
@@ -1562,6 +1677,21 @@
         ctx.textAlign = "center";
         ctx.fillText("Trader", trader.x, trader.y - 26);
       }
+      for (const chest of chests) {
+        ctx.fillStyle = "#7b5633";
+        rect(chest.x - 24, chest.y - 16, 48, 32, 5);
+        ctx.fillStyle = "#b98545";
+        rect(chest.x - 22, chest.y - 18, 44, 10, 4);
+        ctx.strokeStyle = "#e0bd6f";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(chest.x - 19, chest.y - 11, 38, 22);
+        ctx.fillStyle = "#f1d37b";
+        rect(chest.x - 5, chest.y - 3, 10, 8, 2);
+        ctx.fillStyle = "#f6f1df";
+        ctx.font = "12px Segoe UI, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Chest", chest.x, chest.y - 27);
+      }
       for (const a of animals) {
         ctx.fillStyle = "#b79668";
         circle(a.x, a.y, a.r);
@@ -1662,6 +1792,8 @@
         buildOpen: false,
         tradeOpen: false,
         activeTrader: null,
+        chestOpen: false,
+        activeChest: null,
         generatorTimer: 20,
         sentryTimer: 0,
         cooking: false,
@@ -1678,12 +1810,15 @@
       bullets.length = 0;
       drops.length = 0;
       traders.length = 0;
+      chests.length = 0;
       particles.length = 0;
       tools[4].count = 0;
       spawnResources();
+      createChest();
       addLog("Day 1 begins.");
       renderNotices();
       renderTrade();
+      renderChest();
       ui.startScreen.style.display = "none";
       updateUi();
     }
@@ -1716,6 +1851,12 @@
     ui.tradeRows.addEventListener("click", (e) => {
       const button = e.target.closest("[data-trade]");
       if (button) doTrade(button.dataset.trade);
+    });
+    ui.chestRows.addEventListener("click", (e) => {
+      const button = e.target.closest("[data-chest]");
+      if (!button) return;
+      const [action, item] = button.dataset.chest.split(":");
+      moveChestItem(action, item);
     });
     ui.startBtn.addEventListener("click", reset);
 
