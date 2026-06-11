@@ -567,6 +567,7 @@
       <p><b>Wood:</b> fuel the fire and build base parts.</p>
       <p><b>Scrap:</b> metal used for ammo, traps, rigs, and sentries.</p>
       <p><b>Fuel:</b> powers oil rigs and sentry guns.</p>
+      <p><b>Engineer:</b> starts with an improved sentry and extra fuel.</p>
       <p><b>Q:</b> add wood to the campfire when near camp.</p>
       <p><b>U:</b> upgrade the campfire to unlock houses, the army fort, and the stronghold.</p>
       <p><b>Crafting table:</b> press E beside the table, then 1-5 to build.</p>
@@ -717,7 +718,7 @@
       coins: 5,
       inv: { wood: 0, rawFood: 1, cookedFood: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
       builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 },
-      upgrades: { axe: 0, pistol: 0, pack: 0, fire: 0 }
+      upgrades: { axe: 0, pistol: 0, pack: 0, fire: 0, sentry: 0 }
     };
 
     const classes = [
@@ -725,7 +726,7 @@
       { id: "scout", name: "Scout", cost: 2, text: "Faster movement and extra stamina.", apply: () => { player.speed += 32; player.stamina = 115; } },
       { id: "medic", name: "Medic", cost: 3, text: "Starts with more med packs and stronger healing.", apply: () => { player.inv.med += 2; player.upgrades.pack += 1; } },
       { id: "soldier", name: "Soldier", cost: 4, text: "Starts with ammo, pistol damage, and a rocket launcher.", apply: () => { player.reserveAmmo += 24; player.rockets += 4; player.upgrades.pistol += 1; } },
-      { id: "engineer", name: "Engineer", cost: 5, text: "Starts with scrap and better fire upkeep.", apply: () => { player.inv.scrap += 8; player.upgrades.fire += 1; } },
+      { id: "engineer", name: "Engineer", cost: 5, text: "Starts with one improved sentry, scrap, and better fire upkeep.", apply: () => { player.inv.scrap += 8; player.inv.fuel += 3; player.builds.sentry += 1; player.upgrades.sentry += 2; player.upgrades.fire += 1; } },
       { id: "trapper", name: "Trapper", cost: 3, text: "Starts with pelts, traps, and strong axe damage.", apply: () => { player.inv.pelts += 3; player.builds.traps += 2; player.upgrades.axe += 1; } },
       { id: "ranger", name: "Ranger", cost: 4, text: "Fast, accurate, and starts with food from the trail.", apply: () => { player.speed += 18; player.reserveAmmo += 18; player.inv.cookedFood += 3; } },
       { id: "pyro", name: "Pyro", cost: 5, text: "Starts with fire bombs, fuel, and fire resistance.", apply: () => { tools[4].count += 3; player.inv.fuel += 4; player.upgrades.fire += 1; } },
@@ -1885,14 +1886,14 @@
 
       state.sentryTimer -= dt;
       if (player.builds.sentry > 0 && player.inv.fuel > 0 && state.sentryTimer <= 0) {
-        const range = 280;
+        const range = 280 + player.upgrades.sentry * 35;
         const target = zombies
           .filter(z => Math.hypot(z.x - camp.x, z.y - camp.y) < range)
           .sort((a, b) => Math.hypot(a.x - camp.x, a.y - camp.y) - Math.hypot(b.x - camp.x, b.y - camp.y))[0];
         if (target) {
-          hitZombie(target, 1 + Math.floor(player.builds.sentry / 2));
-          if (Math.random() < .35) player.inv.fuel--;
-          state.sentryTimer = Math.max(.18, .85 - player.builds.sentry * .08);
+          hitZombie(target, 1 + Math.floor(player.builds.sentry / 2) + player.upgrades.sentry);
+          if (Math.random() < Math.max(.12, .35 - player.upgrades.sentry * .06)) player.inv.fuel--;
+          state.sentryTimer = Math.max(.12, .85 - player.builds.sentry * .08 - player.upgrades.sentry * .06);
           spark(table.x, table.y, "#6aa6dd", 7);
         }
       }
@@ -2482,7 +2483,7 @@
         coins: 5,
         inv: { wood: 0, rawFood: 1, cookedFood: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
         builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 },
-        upgrades: { axe: 0, pistol: 0, pack: 0, fire: 0 }
+        upgrades: { axe: 0, pistol: 0, pack: 0, fire: 0, sentry: 0 }
       });
       Object.assign(state, {
         running: true,
