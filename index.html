@@ -554,12 +554,13 @@
       </section>
     </div>
 
-    <div class="panel center-tip" id="tip">WASD move. Click to use equipped item. E interacts. 1-5 swaps tools.</div>
+    <div class="panel center-tip" id="tip">WASD move. Click to use equipped item. E interacts. 1-6 swaps tools.</div>
 
     <section class="panel guide" id="guide">
       <h2>What Everything Does</h2>
       <p><b>Axe:</b> chop trees/crates and melee zombies.</p>
       <p><b>Pistol:</b> shoot zombies or hunt animals. Press R to reload.</p>
+      <p><b>Rocket:</b> Soldier starts with a rocket launcher. Rockets explode and clear groups.</p>
       <p><b>Food/Med:</b> heal. Food also restores energy.</p>
       <p><b>Raw food:</b> goes in your sack. Cook it at the fire with X.</p>
       <p><b>Cooked food:</b> fills hunger and gives a small heal.</p>
@@ -613,15 +614,18 @@
         <h2>Beginner Guide</h2>
         <ul>
           <li><b>Move:</b> WASD. Sprint with Shift. Aim with the mouse.</li>
-          <li><b>Use tools:</b> click with the hotbar item equipped. 1-5 switches tools.</li>
+          <li><b>Use tools:</b> click with the hotbar item equipped. 1-6 switches tools.</li>
           <li><b>Survive:</b> keep the campfire fueled with Q, eat cooked food with F, and cook raw food at the fire with X.</li>
           <li><b>Gather:</b> chop trees and crates with the axe. Hunt animals for raw food and pelts.</li>
           <li><b>Build:</b> press E at the workbench, then number keys to build walls, traps, generators, oil rigs, sentries, and chests.</li>
           <li><b>Upgrade:</b> stand near the fire and press U to upgrade the campfire. Higher campfire levels reveal houses, the army fort, and the stronghold.</li>
           <li><b>Trade:</b> wandering traders buy and sell supplies. The pelt trader visits camp every few days and trades pelts for upgrades.</li>
           <li><b>Diamonds:</b> stronghold runs can drop diamonds. Spend diamonds here before a run to buy a class.</li>
+          <li><b>Co-op:</b> turn it on before starting to bring three AI campmates who fight, heal, and help keep the fire alive.</li>
+          <li><b>Classes:</b> buy classes with diamonds. Soldier starts with the rocket launcher.</li>
         </ul>
       </div>
+      <button id="coopBtn" type="button">Co-op Bots: Off</button>
       <button id="startBtn">Start Survival</button>
     </div>
   </div>
@@ -655,6 +659,7 @@
       startScreen: document.getElementById("startScreen"),
       classGrid: document.getElementById("classGrid"),
       diamondWallet: document.getElementById("diamondWallet"),
+      coopBtn: document.getElementById("coopBtn"),
       startBtn: document.getElementById("startBtn")
     };
 
@@ -688,6 +693,9 @@
       diamonds: 0,
       selectedClass: "survivor",
       ownedClasses: ["survivor"],
+      coOp: false,
+      testing: false,
+      cheatBuffer: "",
       messageTimer: 0,
       message: "Stay close to the campfire to heal.",
       logs: ["Welcome to the woods."],
@@ -705,6 +713,7 @@
       tool: 0,
       ammo: 12,
       reserveAmmo: 36,
+      rockets: 0,
       coins: 5,
       inv: { wood: 0, rawFood: 1, cookedFood: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
       builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 },
@@ -715,8 +724,12 @@
       { id: "survivor", name: "Survivor", cost: 0, text: "Balanced start.", apply: () => {} },
       { id: "scout", name: "Scout", cost: 2, text: "Faster movement and extra stamina.", apply: () => { player.speed += 32; player.stamina = 115; } },
       { id: "medic", name: "Medic", cost: 3, text: "Starts with more med packs and stronger healing.", apply: () => { player.inv.med += 2; player.upgrades.pack += 1; } },
-      { id: "soldier", name: "Soldier", cost: 4, text: "Starts with ammo and pistol damage.", apply: () => { player.reserveAmmo += 24; player.upgrades.pistol += 1; } },
-      { id: "engineer", name: "Engineer", cost: 5, text: "Starts with scrap and better fire upkeep.", apply: () => { player.inv.scrap += 8; player.upgrades.fire += 1; } }
+      { id: "soldier", name: "Soldier", cost: 4, text: "Starts with ammo, pistol damage, and a rocket launcher.", apply: () => { player.reserveAmmo += 24; player.rockets += 4; player.upgrades.pistol += 1; } },
+      { id: "engineer", name: "Engineer", cost: 5, text: "Starts with scrap and better fire upkeep.", apply: () => { player.inv.scrap += 8; player.upgrades.fire += 1; } },
+      { id: "trapper", name: "Trapper", cost: 3, text: "Starts with pelts, traps, and strong axe damage.", apply: () => { player.inv.pelts += 3; player.builds.traps += 2; player.upgrades.axe += 1; } },
+      { id: "ranger", name: "Ranger", cost: 4, text: "Fast, accurate, and starts with food from the trail.", apply: () => { player.speed += 18; player.reserveAmmo += 18; player.inv.cookedFood += 3; } },
+      { id: "pyro", name: "Pyro", cost: 5, text: "Starts with fire bombs, fuel, and fire resistance.", apply: () => { tools[4].count += 3; player.inv.fuel += 4; player.upgrades.fire += 1; } },
+      { id: "prospector", name: "Prospector", cost: 6, text: "Starts rich with coins, gems, and extra loot sense.", apply: () => { player.coins += 12; player.inv.gems += 2; player.inv.scrap += 5; } }
     ];
 
     const campfireUpgradeCosts = [
@@ -737,7 +750,8 @@
       { id: "pistol", name: "Pistol", icon: "🔫" },
       { id: "med", name: "Med Pack", icon: "➕" },
       { id: "food", name: "Food", icon: "🥫" },
-      { id: "flare", name: "Fire Bomb", icon: "🔥", count: 0 }
+      { id: "flare", name: "Fire Bomb", icon: "🔥", count: 0 },
+      { id: "rocket", name: "Rocket", icon: "🚀" }
     ];
 
     const trees = [];
@@ -746,9 +760,11 @@
     const animals = [];
     const zombies = [];
     const bullets = [];
+    const rockets = [];
     const drops = [];
     const traders = [];
     const chests = [];
+    const bots = [];
     const particles = [];
 
     function rand(min, max) {
@@ -822,6 +838,37 @@
       renderStartClasses();
     }
 
+    function toggleCoop() {
+      state.coOp = !state.coOp;
+      ui.coopBtn.textContent = `Co-op Bots: ${state.coOp ? "On" : "Off"}`;
+      message(state.coOp ? "Co-op bots will join your next run." : "Co-op bots disabled.");
+    }
+
+    function toggleTestingMode() {
+      state.testing = !state.testing;
+      if (state.testing) {
+        grantTestingResources();
+        addLog("Testing mode enabled: infinite resources, health, and diamonds.");
+      } else {
+        addLog("Testing mode disabled.");
+      }
+    }
+
+    function grantTestingResources() {
+      player.health = 100;
+      player.hunger = 100;
+      player.stamina = 100;
+      player.ammo = 12;
+      player.reserveAmmo = 999;
+      player.rockets = 99;
+      player.coins = 999;
+      for (const item of Object.keys(player.inv)) player.inv[item] = Math.max(player.inv[item], 999);
+      tools[4].count = 99;
+      state.diamonds = Math.max(state.diamonds, 999);
+      camp.fireFuel = 100;
+      renderStartClasses();
+    }
+
     function message(text, seconds = 2.2) {
       state.message = text;
       state.messageTimer = seconds;
@@ -845,7 +892,7 @@
       if (nearest(traders, 62)) return "Press E to open the wandering trader shop.";
       if (nearest(crates, 58)) return "Use the axe on crates to find ammo, scrap metal, fuel, med packs, or gems.";
       if (nearest(trees, 58)) return "Use the axe on trees to gather wood.";
-      return "WASD move. Click to use equipped item. E interacts. 1-5 swaps tools. Q fuels fire. U upgrades campfire.";
+      return "WASD move. Click to use equipped item. E interacts. 1-6 swaps tools. Q fuels fire. U upgrades campfire.";
     }
 
     function nearCampfire() {
@@ -959,6 +1006,17 @@
       message("Pelt trader at camp. Give 1 pelt for one of 3 upgrades.", 4);
     }
 
+    function createCoopBots() {
+      bots.length = 0;
+      if (!state.coOp) return;
+      bots.push(
+        { name: "Rowan", role: "Rifle", x: player.x - 34, y: player.y + 28, r: 14, color: "#6aa6dd", cooldown: .4, healTimer: 0, gatherTimer: 0 },
+        { name: "Patch", role: "Medic", x: player.x + 38, y: player.y + 22, r: 14, color: "#64c964", cooldown: 1.2, healTimer: 4, gatherTimer: 0 },
+        { name: "Sparks", role: "Builder", x: player.x, y: player.y - 42, r: 14, color: "#e5b84f", cooldown: .8, healTimer: 0, gatherTimer: 5 }
+      );
+      addLog("Co-op bots joined the camp.");
+    }
+
     function shoot() {
       if (state.shootTimer > 0 || player.tool !== 1 || state.gameOver) return;
       if (player.ammo <= 0) {
@@ -977,6 +1035,27 @@
         damage: 1 + player.upgrades.pistol
       });
       spark(player.x + Math.cos(angle) * 28, player.y + Math.sin(angle) * 28, "#ffd76a", 4);
+    }
+
+    function shootRocket() {
+      if (state.shootTimer > 0 || state.gameOver) return;
+      if (player.rockets <= 0 && !state.testing) {
+        message("No rockets left.");
+        return;
+      }
+      if (!state.testing) player.rockets--;
+      state.shootTimer = .8;
+      const angle = Math.atan2(mouse.y + camera.y - player.y, mouse.x + camera.x - player.x);
+      rockets.push({
+        x: player.x + Math.cos(angle) * 28,
+        y: player.y + Math.sin(angle) * 28,
+        vx: Math.cos(angle) * 520,
+        vy: Math.sin(angle) * 520,
+        life: 1.2,
+        fromBot: false
+      });
+      spark(player.x + Math.cos(angle) * 30, player.y + Math.sin(angle) * 30, "#ff884d", 8);
+      addLog("Rocket launched.");
     }
 
     function reload() {
@@ -1521,6 +1600,7 @@
       if (player.tool === 2) useMed();
       if (player.tool === 3) eatFood();
       if (player.tool === 4) fireBomb();
+      if (player.tool === 5) shootRocket();
     }
 
     function useMed() {
@@ -1642,6 +1722,7 @@
       }
       player.hunger = Math.max(0, player.hunger - dt * (phase() === "night" ? 1.05 : .72));
       if (player.hunger <= 0) player.health -= 4.5 * dt;
+      if (state.testing) grantTestingResources();
 
       const oldDay = state.day;
       state.day = 1 + Math.floor(state.time / 120);
@@ -1716,6 +1797,8 @@
         if (trader.timer <= 0) removeFrom(traders, trader);
       }
 
+      updateBots(dt);
+
       if (phase() === "day") {
         state.traderTimer -= dt;
         if (state.traderTimer <= 0) {
@@ -1731,6 +1814,61 @@
       if (oldPhase === "night" && phase() === "day") {
         addLog("Sunrise weakens the remaining zombies.");
         message("Daylight is making leftover zombies despawn.", 3);
+      }
+    }
+
+    function updateBots(dt) {
+      for (let i = 0; i < bots.length; i++) {
+        const bot = bots[i];
+        const ring = 42 + i * 22;
+        const goalAngle = performance.now() / 900 + i * Math.PI * 2 / Math.max(1, bots.length);
+        let goal = { x: player.x + Math.cos(goalAngle) * ring, y: player.y + Math.sin(goalAngle) * ring };
+        const target = zombies
+          .filter(z => Math.hypot(z.x - bot.x, z.y - bot.y) < 330)
+          .sort((a, b) => Math.hypot(a.x - bot.x, a.y - bot.y) - Math.hypot(b.x - bot.x, b.y - bot.y))[0];
+        if (target) {
+          goal = { x: target.x - Math.sign(target.x - bot.x || 1) * 140, y: target.y - Math.sign(target.y - bot.y || 1) * 90 };
+          bot.cooldown -= dt;
+          if (bot.cooldown <= 0) {
+            hitZombie(target, bot.role === "Rifle" ? 2 : 1);
+            spark(bot.x, bot.y, bot.color, 4);
+            bot.cooldown = bot.role === "Rifle" ? .55 : .95;
+          }
+        }
+        const angle = Math.atan2(goal.y - bot.y, goal.x - bot.x);
+        const speed = target ? 170 : 135;
+        bot.x = clamp(bot.x + Math.cos(angle) * speed * dt, 18, world.w - 18);
+        bot.y = clamp(bot.y + Math.sin(angle) * speed * dt, 18, world.h - 18);
+
+        if (bot.role === "Medic") {
+          bot.healTimer -= dt;
+          if (bot.healTimer <= 0) {
+            if (player.health < 78) {
+              player.health = Math.min(100, player.health + 16);
+              addLog("Patch healed you.");
+            }
+            if (camp.fireFuel < 45 && player.inv.wood > 0) {
+              player.inv.wood--;
+              camp.fireFuel = Math.min(100, camp.fireFuel + 18);
+              addLog("Patch fed the campfire.");
+            }
+            bot.healTimer = 7;
+          }
+        }
+
+        if (bot.role === "Builder") {
+          bot.gatherTimer -= dt;
+          if (bot.gatherTimer <= 0 && phase() === "day") {
+            if (Math.random() < .55) {
+              player.inv.wood += 2;
+              addLog("Sparks gathered 2 wood.");
+            } else {
+              player.inv.scrap += 1;
+              addLog("Sparks found 1 scrap.");
+            }
+            bot.gatherTimer = 12;
+          }
+        }
       }
     }
 
@@ -1783,6 +1921,23 @@
         if (b.life <= 0) removeFrom(bullets, b);
       }
 
+      for (const r of [...rockets]) {
+        r.x += r.vx * dt;
+        r.y += r.vy * dt;
+        r.life -= dt;
+        let exploded = r.life <= 0;
+        for (const z of zombies) {
+          if (Math.hypot(r.x - z.x, r.y - z.y) < z.r + 8) {
+            exploded = true;
+            break;
+          }
+        }
+        if (exploded) {
+          explodeRocket(r.x, r.y);
+          removeFrom(rockets, r);
+        }
+      }
+
       for (const z of [...zombies]) {
         if (phase() === "day") {
           z.daylight = (z.daylight || 0) + dt;
@@ -1794,7 +1949,11 @@
           }
         }
 
-        const target = Math.hypot(z.x - camp.x, z.y - camp.y) < 170 ? player : camp;
+        const defenders = [player, ...bots];
+        const closeDefender = defenders
+          .filter(d => Math.hypot(z.x - d.x, z.y - d.y) < 190)
+          .sort((a, b) => Math.hypot(z.x - a.x, z.y - a.y) - Math.hypot(z.x - b.x, z.y - b.y))[0];
+        const target = closeDefender || camp;
         const angle = Math.atan2(target.y - z.y, target.x - z.x);
         z.x += Math.cos(angle) * z.speed * dt;
         z.y += Math.sin(angle) * z.speed * dt;
@@ -1807,6 +1966,17 @@
             else player.health -= 10;
             z.bite = .75;
             spark(player.x, player.y, blocked ? "#b8975c" : "#d95858", 8);
+          }
+        }
+
+        for (const bot of bots) {
+          if (Math.hypot(z.x - bot.x, z.y - bot.y) < z.r + bot.r + 3) {
+            z.bite -= dt;
+            if (z.bite <= 0) {
+              z.hp -= .4;
+              z.bite = .8;
+              spark(bot.x, bot.y, bot.color, 6);
+            }
           }
         }
 
@@ -1841,6 +2011,15 @@
       }
     }
 
+    function explodeRocket(x, y) {
+      for (const z of [...zombies]) {
+        const d = Math.hypot(z.x - x, z.y - y);
+        if (d < 150) hitZombie(z, d < 62 ? 7 : 4);
+      }
+      spark(x, y, "#ff884d", 48);
+      spark(x, y, "#ffd66b", 28);
+    }
+
     function updateUi() {
       ui.healthFill.style.width = `${player.health}%`;
       ui.staminaFill.style.width = `${player.stamina}%`;
@@ -1853,8 +2032,8 @@
       ui.phaseText.textContent = `Day ${state.day} - ${phaseName()}`;
       ui.dayCounter.textContent = `Day ${state.day} | Campfire ${campfirePercent()}% | Level ${camp.level}/4 | Diamonds ${state.diamonds}`;
       ui.objectiveText.textContent = phase() === "day"
-        ? "Gather supplies, hunt, craft ammo, and trade before dark."
-        : `Defend camp. Zombies nearby: ${zombies.length}`;
+        ? `Gather supplies, hunt, craft ammo, and trade before dark.${state.coOp ? " Co-op bots are active." : ""}${state.testing ? " Testing mode on." : ""}`
+        : `Defend camp. Zombies nearby: ${zombies.length}${state.coOp ? " | Bots helping" : ""}${state.testing ? " | Testing mode" : ""}`;
 
       const inv = [
         ["Wood", player.inv.wood],
@@ -1868,6 +2047,7 @@
         ["Meds", player.inv.med],
         ["Pelts", player.inv.pelts],
         ["Coins", player.coins],
+        ["Rockets", player.rockets],
         ["Chests", chests.length],
         ["Fire", `${campfirePercent()}%`]
       ];
@@ -1884,6 +2064,7 @@
         if (tool.id === "med") count = player.inv.med;
         if (tool.id === "food") count = player.inv.cookedFood;
         if (tool.id === "flare") count = tool.count;
+        if (tool.id === "rocket") count = player.rockets;
         return `<button class="slot ${player.tool === i ? "active" : ""}" data-slot="${i}" title="${tool.name}">
           <small>${i + 1}</small>${tool.icon}<b class="slot-label">${tool.name}</b><span class="slot-count">${count}</span>
         </button>`;
@@ -2192,6 +2373,16 @@
         ctx.fillStyle = "#eee1bf";
         circle(a.x + 7, a.y - 5, 4);
       }
+      for (const bot of bots) {
+        ctx.fillStyle = bot.color;
+        circle(bot.x, bot.y, bot.r);
+        ctx.fillStyle = "#22251f";
+        circle(bot.x, bot.y + 4, bot.r - 5);
+        ctx.fillStyle = "#f6f1df";
+        ctx.font = "11px Segoe UI, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(bot.name, bot.x, bot.y - 22);
+      }
       for (const z of zombies) {
         ctx.fillStyle = z.type === "cultist" ? "#6d3b62" : "#456b44";
         circle(z.x, z.y, z.r);
@@ -2213,6 +2404,16 @@
         ctx.moveTo(b.x, b.y);
         ctx.lineTo(b.x - b.vx * .025, b.y - b.vy * .025);
         ctx.stroke();
+      }
+      for (const r of rockets) {
+        ctx.strokeStyle = "#ff884d";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(r.x, r.y);
+        ctx.lineTo(r.x - r.vx * .035, r.y - r.vy * .035);
+        ctx.stroke();
+        ctx.fillStyle = "#f6f1df";
+        circle(r.x, r.y, 5);
       }
       for (const p of particles) {
         ctx.globalAlpha = clamp(p.life * 2, 0, 1);
@@ -2277,6 +2478,7 @@
         tool: 0,
         ammo: 12,
         reserveAmmo: 36,
+        rockets: 0,
         coins: 5,
         inv: { wood: 0, rawFood: 1, cookedFood: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
         builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 },
@@ -2315,12 +2517,16 @@
       for (const location of locations) location.searchedDay = 0;
       zombies.length = 0;
       bullets.length = 0;
+      rockets.length = 0;
       drops.length = 0;
       traders.length = 0;
       chests.length = 0;
       particles.length = 0;
+      bots.length = 0;
       tools[4].count = 0;
       chosenClass.apply();
+      createCoopBots();
+      if (state.testing) grantTestingResources();
       spawnResources();
       createChest();
       addLog(`Day 1 begins as ${chosenClass.name}.`);
@@ -2334,6 +2540,13 @@
     window.addEventListener("resize", resize);
     window.addEventListener("keydown", (e) => {
       keys.add(e.code);
+      if (e.key && e.key.length === 1) {
+        state.cheatBuffer = (state.cheatBuffer + e.key.toLowerCase()).slice(-12);
+        if (state.cheatBuffer.endsWith("mustardmango")) {
+          state.cheatBuffer = "";
+          toggleTestingMode();
+        }
+      }
       if (e.code.startsWith("Digit")) {
         const slot = Number(e.code.slice(5)) - 1;
         if (!buildAtTable(slot) && tools[slot]) player.tool = slot;
@@ -2367,6 +2580,7 @@
       moveChestItem(action, item);
     });
     ui.startBtn.addEventListener("click", reset);
+    ui.coopBtn.addEventListener("click", toggleCoop);
     ui.classGrid.addEventListener("click", (e) => {
       const button = e.target.closest("[data-class]");
       if (button) selectClass(button.dataset.class);
