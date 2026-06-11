@@ -179,15 +179,15 @@
     }
 
     .slot {
-      width: 64px;
-      height: 64px;
+      width: 72px;
+      height: 72px;
       border: 2px solid rgba(255, 255, 255, .2);
       border-radius: 8px;
       background: rgba(0, 0, 0, .3);
       display: grid;
       place-items: center;
       position: relative;
-      font-size: 28px;
+      font-size: 27px;
       user-select: none;
     }
 
@@ -210,6 +210,34 @@
       bottom: 4px;
       font-size: 11px;
       color: var(--muted);
+    }
+
+    .slot-label {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      bottom: 5px;
+      color: var(--text);
+      font-size: 10px;
+      font-weight: 650;
+      line-height: 1;
+      overflow: hidden;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .slot-count {
+      position: absolute;
+      right: 5px;
+      top: 4px;
+      bottom: auto;
+      min-width: 14px;
+      color: var(--warn);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+      text-align: right;
     }
 
     .craft {
@@ -359,7 +387,9 @@
     }
 
     .screen-card {
-      width: min(520px, 100%);
+      width: min(760px, 100%);
+      max-height: calc(100vh - 48px);
+      overflow: auto;
       border-radius: 8px;
       padding: 24px;
       background: #24261f;
@@ -388,6 +418,62 @@
       color: #211a08;
       font-weight: 700;
       cursor: pointer;
+    }
+
+    .class-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+      margin: 14px 0 4px;
+      text-align: left;
+    }
+
+    .class-card {
+      border: 1px solid rgba(255, 255, 255, .14);
+      border-radius: 7px;
+      padding: 9px;
+      background: rgba(0, 0, 0, .22);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .class-card.active {
+      border-color: var(--warn);
+      box-shadow: inset 0 0 0 1px rgba(229, 184, 79, .35);
+    }
+
+    .class-card b {
+      display: block;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .class-card button {
+      width: 100%;
+      margin-top: 8px;
+      padding: 7px 8px;
+    }
+
+    .beginner-guide {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, .14);
+      text-align: left;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.42;
+    }
+
+    .beginner-guide h2 {
+      margin: 0 0 8px;
+      color: var(--text);
+      font-size: 17px;
+    }
+
+    .beginner-guide ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
     }
 
     @media (max-width: 820px) {
@@ -438,8 +524,8 @@
       }
 
       .slot {
-        width: 56px;
-        height: 56px;
+        width: 62px;
+        height: 62px;
       }
     }
   </style>
@@ -458,6 +544,7 @@
 
       <section class="panel clock">
         <strong id="phaseText">Day 1 - Morning</strong>
+        <span id="dayCounter">Day counter: 1</span>
         <span id="objectiveText">Loot, forage, chop trees, craft, and be back by night.</span>
       </section>
 
@@ -480,6 +567,7 @@
       <p><b>Scrap:</b> metal used for ammo, traps, rigs, and sentries.</p>
       <p><b>Fuel:</b> powers oil rigs and sentry guns.</p>
       <p><b>Q:</b> add wood to the campfire when near camp.</p>
+      <p><b>U:</b> upgrade the campfire to unlock houses, the army fort, and the stronghold.</p>
       <p><b>Crafting table:</b> press E beside the table, then 1-5 to build.</p>
     </section>
 
@@ -491,6 +579,7 @@
       <div class="recipe"><b>4 Oil Rig:</b> 8 wood, 8 scrap, 2 fuel. Makes fuel each day.</div>
       <div class="recipe"><b>5 Sentry Gun:</b> 18 scrap, 3 fuel, 12 coins. Shoots zombies.</div>
       <div class="recipe"><b>6 Chest:</b> 12 wood, 2 scrap. Stores sack items at camp.</div>
+      <div class="recipe"><b>Campfire U:</b> upgrade near the fire. L2 costs 18 wood, 6 scrap, 2 fuel. Later levels cost more.</div>
     </section>
 
     <section class="panel trade-menu" id="tradeMenu">
@@ -509,7 +598,7 @@
       <section class="panel log" id="log"></section>
       <nav class="panel hotbar" id="hotbar" aria-label="Hotbar"></nav>
       <section class="panel craft">
-        <b>Quick craft:</b> C wall repair, V ammo, B med pack, F eat cooked food, X cook raw food, Q fuel fire. E opens the crafting table when close.
+        <b>Quick craft:</b> C wall repair, V ammo, B med pack, F eat cooked food, X cook raw food, Q fuel fire, U upgrade fire. E opens the crafting table when close.
       </section>
     </div>
   </div>
@@ -518,7 +607,21 @@
     <div class="screen-card">
       <h1>Last Campfire</h1>
       <p>Build up your camp by day. Hold the fire line by night.</p>
-      <p>Use the guide on the left for every item. You start with one chest, and the workbench can build more storage, walls, traps, generators, oil rigs, and sentry guns.</p>
+      <p id="diamondWallet">Diamonds: 0</p>
+      <div class="class-grid" id="classGrid"></div>
+      <div class="beginner-guide">
+        <h2>Beginner Guide</h2>
+        <ul>
+          <li><b>Move:</b> WASD. Sprint with Shift. Aim with the mouse.</li>
+          <li><b>Use tools:</b> click with the hotbar item equipped. 1-5 switches tools.</li>
+          <li><b>Survive:</b> keep the campfire fueled with Q, eat cooked food with F, and cook raw food at the fire with X.</li>
+          <li><b>Gather:</b> chop trees and crates with the axe. Hunt animals for raw food and pelts.</li>
+          <li><b>Build:</b> press E at the workbench, then number keys to build walls, traps, generators, oil rigs, sentries, and chests.</li>
+          <li><b>Upgrade:</b> stand near the fire and press U to upgrade the campfire. Higher campfire levels reveal houses, the army fort, and the stronghold.</li>
+          <li><b>Trade:</b> wandering traders buy and sell supplies. The pelt trader visits camp every few days and trades pelts for upgrades.</li>
+          <li><b>Diamonds:</b> stronghold runs can drop diamonds. Spend diamonds here before a run to buy a class.</li>
+        </ul>
+      </div>
       <button id="startBtn">Start Survival</button>
     </div>
   </div>
@@ -537,6 +640,7 @@
       staminaText: document.getElementById("staminaText"),
       hungerText: document.getElementById("hungerText"),
       phaseText: document.getElementById("phaseText"),
+      dayCounter: document.getElementById("dayCounter"),
       objectiveText: document.getElementById("objectiveText"),
       inventoryGrid: document.getElementById("inventoryGrid"),
       hotbar: document.getElementById("hotbar"),
@@ -549,13 +653,15 @@
       chestMenu: document.getElementById("chestMenu"),
       chestRows: document.getElementById("chestRows"),
       startScreen: document.getElementById("startScreen"),
+      classGrid: document.getElementById("classGrid"),
+      diamondWallet: document.getElementById("diamondWallet"),
       startBtn: document.getElementById("startBtn")
     };
 
     const keys = new Set();
     const mouse = { x: 0, y: 0, down: false };
-    const world = { w: 2400, h: 1600 };
-    const camp = { x: world.w / 2, y: world.h / 2, r: 135, fire: 72, fireFuel: 70, barricade: 0 };
+    const world = { w: 2800, h: 1900 };
+    const camp = { x: world.w / 2, y: world.h / 2, r: 135, fire: 72, fireFuel: 70, level: 1, barricade: 0 };
     const table = { x: camp.x + 112, y: camp.y - 68, r: 30 };
     const camera = { x: 0, y: 0 };
     const state = {
@@ -568,6 +674,7 @@
       swingTimer: 0,
       spawnTimer: 0,
       traderTimer: 18,
+      nextPeltTraderDay: 3,
       buildOpen: false,
       tradeOpen: false,
       activeTrader: null,
@@ -578,6 +685,9 @@
       cooking: false,
       cookingTimer: 0,
       cookingTotal: 2.8,
+      diamonds: 0,
+      selectedClass: "survivor",
+      ownedClasses: ["survivor"],
       messageTimer: 0,
       message: "Stay close to the campfire to heal.",
       logs: ["Welcome to the woods."],
@@ -597,8 +707,30 @@
       reserveAmmo: 36,
       coins: 5,
       inv: { wood: 0, rawFood: 1, cookedFood: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
-      builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 }
+      builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 },
+      upgrades: { axe: 0, pistol: 0, pack: 0, fire: 0 }
     };
+
+    const classes = [
+      { id: "survivor", name: "Survivor", cost: 0, text: "Balanced start.", apply: () => {} },
+      { id: "scout", name: "Scout", cost: 2, text: "Faster movement and extra stamina.", apply: () => { player.speed += 32; player.stamina = 115; } },
+      { id: "medic", name: "Medic", cost: 3, text: "Starts with more med packs and stronger healing.", apply: () => { player.inv.med += 2; player.upgrades.pack += 1; } },
+      { id: "soldier", name: "Soldier", cost: 4, text: "Starts with ammo and pistol damage.", apply: () => { player.reserveAmmo += 24; player.upgrades.pistol += 1; } },
+      { id: "engineer", name: "Engineer", cost: 5, text: "Starts with scrap and better fire upkeep.", apply: () => { player.inv.scrap += 8; player.upgrades.fire += 1; } }
+    ];
+
+    const campfireUpgradeCosts = [
+      null,
+      { wood: 18, scrap: 6, fuel: 2 },
+      { wood: 28, scrap: 12, fuel: 4 },
+      { wood: 42, scrap: 20, fuel: 8, gems: 1 }
+    ];
+
+    const locations = [
+      { id: "houses", name: "Abandoned Houses", x: 420, y: 420, r: 70, level: 2, kind: "houses", searchedDay: 0 },
+      { id: "fort", name: "Army Fort", x: world.w - 420, y: 430, r: 95, level: 3, kind: "fort", searchedDay: 0 },
+      { id: "stronghold", name: "Cult Stronghold", x: world.w - 470, y: world.h - 370, r: 110, level: 4, kind: "stronghold", searchedDay: 0 }
+    ];
 
     const tools = [
       { id: "axe", name: "Axe", icon: "🪓" },
@@ -659,6 +791,37 @@
         .join("");
     }
 
+    function renderStartClasses() {
+      ui.diamondWallet.textContent = `Diamonds: ${state.diamonds}`;
+      ui.classGrid.innerHTML = classes.map(c => {
+        const selected = state.selectedClass === c.id;
+        const owned = state.ownedClasses.includes(c.id);
+        const affordable = owned || state.diamonds >= c.cost;
+        const label = selected ? "Selected" : owned ? "Choose" : `Buy ${c.cost}`;
+        return `<div class="class-card ${selected ? "active" : ""}">
+          <b>${c.name}</b>
+          <span>${c.text}</span>
+          <button data-class="${c.id}" ${!affordable && !selected ? "disabled" : ""}>${label}</button>
+        </div>`;
+      }).join("");
+    }
+
+    function selectClass(id) {
+      const chosen = classes.find(c => c.id === id);
+      if (!chosen) return;
+      if (!state.ownedClasses.includes(id) && chosen.cost > 0) {
+        if (state.diamonds < chosen.cost) {
+          message(`Need ${chosen.cost} diamonds for ${chosen.name}.`);
+          return;
+        }
+        state.diamonds -= chosen.cost;
+        state.ownedClasses.push(id);
+        addLog(`Bought class: ${chosen.name}.`);
+      }
+      state.selectedClass = id;
+      renderStartClasses();
+    }
+
     function message(text, seconds = 2.2) {
       state.message = text;
       state.messageTimer = seconds;
@@ -669,17 +832,20 @@
       if (state.buildOpen) return "Crafting table open: 1 wall, 2 trap, 3 food generator, 4 oil rig, 5 sentry gun, 6 chest.";
       if (state.tradeOpen) return "Trader shop open. Use the buttons to buy or sell, or press E to close.";
       if (state.chestOpen) return "Chest open. Use the buttons to deposit or withdraw sack items.";
+      const location = nearest(locations, 95);
+      if (location) return areaUnlocked(location) ? `Press E to search ${location.name}.` : `Upgrade the campfire to level ${location.level} to unlock ${location.name}.`;
       if (nearTable()) return "Press E to open the crafting table.";
       if (nearest(chests, 58)) return "Press E to open this storage chest.";
       if (nearCampfire() && state.cooking) return "Cooking raw meat...";
       if (nearCampfire() && player.inv.rawFood > 0) return "You have raw meat in your sack. Press X to cook it at the fire.";
-      if (nearCampfire()) return "Campfire heals you. Q fuels it with wood. X cooks raw food into cooked food.";
+      if (nearCampfire()) return "Campfire heals you. Q fuels it with wood. X cooks raw food. U upgrades the fire.";
       if (nearest(forage, 46)) return "Press E to forage berries or herbs.";
       if (nearest(animals, 50)) return "Press E to hunt, or shoot animals for raw food and pelts.";
+      if (nearest(traders.filter(t => t.type === "pelt"), 62)) return "Press E by the pelt trader. Give 1 pelt, then choose one of 3 upgrades.";
       if (nearest(traders, 62)) return "Press E to open the wandering trader shop.";
       if (nearest(crates, 58)) return "Use the axe on crates to find ammo, scrap metal, fuel, med packs, or gems.";
       if (nearest(trees, 58)) return "Use the axe on trees to gather wood.";
-      return "WASD move. Click to use equipped item. E interacts. 1-5 swaps tools. Q fuels fire.";
+      return "WASD move. Click to use equipped item. E interacts. 1-5 swaps tools. Q fuels fire. U upgrades campfire.";
     }
 
     function nearCampfire() {
@@ -734,6 +900,14 @@
       return p;
     }
 
+    function areaUnlocked(location) {
+      return camp.level >= location.level;
+    }
+
+    function campfirePercent() {
+      return Math.round(clamp(camp.fireFuel, 0, 100));
+    }
+
     function spawnZombie() {
       const side = Math.floor(rand(0, 4));
       const z = {
@@ -747,11 +921,42 @@
       zombies.push(z);
     }
 
+    function spawnEnemyAt(x, y, type = "zombie", count = 1) {
+      for (let i = 0; i < count; i++) {
+        const angle = rand(0, Math.PI * 2);
+        const radius = rand(24, 82);
+        zombies.push({
+          x: clamp(x + Math.cos(angle) * radius, 20, world.w - 20),
+          y: clamp(y + Math.sin(angle) * radius, 20, world.h - 20),
+          r: type === "cultist" ? 15 : 16,
+          hp: type === "cultist" ? 4 + Math.floor(state.day / 3) : 2 + Math.floor(state.day / 2),
+          speed: type === "cultist" ? 96 + state.day * 3 : 64 + state.day * 4,
+          bite: 0,
+          type
+        });
+      }
+    }
+
     function spawnTrader() {
       const p = randomFarPoint(500);
-      traders.push({ x: p.x, y: p.y, r: 18, timer: 36, sold: false });
+      traders.push({ x: p.x, y: p.y, r: 18, timer: 36, sold: false, type: "wandering" });
       addLog("A wandering trader entered the woods.");
       message("Trader nearby. Press E next to them to trade.");
+    }
+
+    function spawnPeltTrader() {
+      if (traders.some(t => t.type === "pelt")) return;
+      traders.push({
+        x: camp.x - 105,
+        y: camp.y + 62,
+        r: 19,
+        timer: 78,
+        type: "pelt",
+        offered: false,
+        sold: false
+      });
+      addLog("The pelt trader set up beside the campfire.");
+      message("Pelt trader at camp. Give 1 pelt for one of 3 upgrades.", 4);
     }
 
     function shoot() {
@@ -769,7 +974,7 @@
         vx: Math.cos(angle) * 760,
         vy: Math.sin(angle) * 760,
         life: .8,
-        damage: 1
+        damage: 1 + player.upgrades.pistol
       });
       spark(player.x + Math.cos(angle) * 28, player.y + Math.sin(angle) * 28, "#ffd76a", 4);
     }
@@ -792,7 +997,7 @@
         target.hp--;
         spark(target.x, target.y, target.hp <= 0 ? "#dca95a" : "#f0d095", 8);
         if (trees.includes(target) && target.hp <= 0) {
-          const wood = Math.floor(rand(2, 5));
+          const wood = Math.floor(rand(2, 5)) + player.upgrades.axe;
           player.inv.wood += wood;
           removeFrom(trees, target);
           addLog(`Picked up ${wood} wood.`);
@@ -804,7 +1009,7 @@
       } else {
         const z = nearest(zombies, 66);
         if (z) {
-          hitZombie(z, 2);
+          hitZombie(z, 2 + player.upgrades.axe);
           message("Axe hit! It does close-range damage to zombies.", 1.2);
         }
       }
@@ -829,7 +1034,7 @@
         player.inv.gems += 1;
         addLog("Found a bright gem.");
       }
-      drops.push({ x: crate.x, y: crate.y, r: 8, life: 1, color: "#f3cc64" });
+      drops.push({ x: crate.x, y: crate.y, r: 10, life: 1, kind: "scrap", color: "#d6d0bd", spin: rand(0, Math.PI * 2) });
     }
 
     function nearest(list, range) {
@@ -866,6 +1071,12 @@
         return;
       }
 
+      const location = nearest(locations, 105);
+      if (location) {
+        searchLocation(location);
+        return;
+      }
+
       const berry = nearest(forage, 46);
       if (berry) {
         if (berry.kind === "berries") {
@@ -885,7 +1096,7 @@
         player.inv.rawFood += 2;
         player.inv.pelts += 1;
         removeFrom(animals, animal);
-        addLog("Collected raw meat.");
+        addLog("Collected raw meat and a pelt.");
         spark(animal.x, animal.y, "#e5bf80", 10);
         return;
       }
@@ -897,6 +1108,45 @@
       }
 
       message("Nothing close enough to interact with.");
+    }
+
+    function searchLocation(location) {
+      if (!areaUnlocked(location)) {
+        message(`Upgrade campfire to level ${location.level} to unlock ${location.name}.`, 3);
+        return;
+      }
+      if (location.searchedDay === state.day) {
+        message(`${location.name} has already been searched today.`);
+        return;
+      }
+      location.searchedDay = state.day;
+      if (location.kind === "houses") {
+        const food = Math.floor(rand(1, 4));
+        const scrap = Math.floor(rand(2, 6));
+        player.inv.cookedFood += food;
+        player.inv.scrap += scrap;
+        if (Math.random() < .45) player.inv.med++;
+        spawnEnemyAt(location.x, location.y, "zombie", 2);
+        addLog(`Searched houses. Found ${food} food and ${scrap} scrap.`);
+      }
+      if (location.kind === "fort") {
+        player.reserveAmmo += 18;
+        player.inv.scrap += 10;
+        player.inv.fuel += 2;
+        spawnEnemyAt(location.x, location.y, "zombie", 8);
+        addLog("Raided the army fort. Found ammo, scrap, and fuel.");
+      }
+      if (location.kind === "stronghold") {
+        const diamonds = Math.random() < .5 ? 2 : 1;
+        const gems = Math.floor(rand(1, 3));
+        player.inv.gems += gems;
+        state.diamonds += diamonds;
+        tools[4].count += 1;
+        spawnEnemyAt(location.x, location.y, "cultist", 6);
+        addLog(`Stronghold cache opened. Found ${diamonds} diamond${diamonds === 1 ? "" : "s"} and ${gems} gems.`);
+      }
+      spark(location.x, location.y, location.kind === "stronghold" ? "#9ddcff" : "#f2d07c", 24);
+      renderStartClasses();
     }
 
     function toggleTrade(trader) {
@@ -913,6 +1163,11 @@
     function renderTrade() {
       ui.tradeMenu.classList.toggle("open", state.tradeOpen);
       if (!state.tradeOpen) return;
+      if (state.activeTrader?.type === "pelt") {
+        renderPeltTrade();
+        return;
+      }
+      ui.tradeMenu.querySelector("h2").textContent = "Wandering Trader";
       const summary = `<div class="trade-row"><span><b>Your sack:</b><br>${player.coins} coins, ${player.inv.gems} gems, ${player.inv.pelts} pelts, ${player.inv.herbs} herbs, ${player.inv.wood} wood, ${player.inv.scrap} scrap</span></div>`;
       const rows = [
         ["buy-ammo", "Buy 12 ammo", "8 coins"],
@@ -933,8 +1188,67 @@
       `).join("");
     }
 
+    function peltUpgradePool() {
+      return [
+        {
+          id: "axe",
+          name: `Tempered Axe ${player.upgrades.axe + 1}`,
+          text: "+1 axe damage and better wood hauls",
+          apply: () => player.upgrades.axe++
+        },
+        {
+          id: "pistol",
+          name: `Long Barrel ${player.upgrades.pistol + 1}`,
+          text: "+1 pistol damage",
+          apply: () => player.upgrades.pistol++
+        },
+        {
+          id: "pack",
+          name: `Field Pack ${player.upgrades.pack + 1}`,
+          text: "Food and med packs restore more",
+          apply: () => player.upgrades.pack++
+        },
+        {
+          id: "fire",
+          name: `Fire Keeper ${player.upgrades.fire + 1}`,
+          text: "Campfire fuel burns slower",
+          apply: () => player.upgrades.fire++
+        }
+      ];
+    }
+
+    function peltOffers(trader) {
+      if (!trader.offers) trader.offers = peltUpgradePool().sort(() => Math.random() - .5).slice(0, 3);
+      return trader.offers;
+    }
+
+    function renderPeltTrade() {
+      const trader = state.activeTrader;
+      ui.tradeMenu.querySelector("h2").textContent = "Pelt Trader";
+      const summary = `<div class="trade-row"><span><b>Pelt trader:</b><br>${player.inv.pelts} pelts in sack. Next visit: day ${state.nextPeltTraderDay}.</span></div>`;
+      if (!trader.offered) {
+        ui.tradeRows.innerHTML = summary + `
+          <div class="trade-row">
+            <span><b>Give 1 pelt</b><br>Unlock 3 upgrade choices.</span>
+            <button data-trade="pelt-give">Give</button>
+          </div>
+        `;
+        return;
+      }
+      ui.tradeRows.innerHTML = summary + peltOffers(trader).map((offer, i) => `
+        <div class="trade-row">
+          <span><b>${i + 1}. ${offer.name}</b><br>${offer.text}</span>
+          <button data-trade="pelt-pick:${offer.id}">Pick</button>
+        </div>
+      `).join("");
+    }
+
     function doTrade(id) {
       if (!state.tradeOpen) return;
+      if (state.activeTrader?.type === "pelt") {
+        doPeltTrade(id);
+        return;
+      }
       const buy = (cost, action, label) => {
         if (player.coins < cost) {
           message(`Need ${cost} coins.`);
@@ -962,6 +1276,35 @@
       if (id === "sell-herbs") sell("herbs", 2, 4, "Sold herbs.");
       if (id === "sell-wood") sell("wood", 5, 3, "Sold wood.");
       if (id === "sell-scrap") sell("scrap", 3, 5, "Sold scrap metal.");
+    }
+
+    function doPeltTrade(id) {
+      const trader = state.activeTrader;
+      if (!trader || trader.type !== "pelt") return;
+      if (id === "pelt-give") {
+        if (player.inv.pelts <= 0) {
+          message("Need 1 pelt for the pelt trader.");
+          return;
+        }
+        player.inv.pelts--;
+        trader.offered = true;
+        peltOffers(trader);
+        addLog("Gave the pelt trader 1 pelt.");
+        renderTrade();
+        return;
+      }
+      if (!id.startsWith("pelt-pick:") || !trader.offered) return;
+      const pick = id.split(":")[1];
+      const offer = peltOffers(trader).find(o => o.id === pick);
+      if (!offer) return;
+      offer.apply();
+      trader.sold = true;
+      trader.timer = 8;
+      addLog(`Picked upgrade: ${offer.name}.`);
+      message(`${offer.name} upgraded.`, 3);
+      state.tradeOpen = false;
+      state.activeTrader = null;
+      renderTrade();
     }
 
     function blankStorage() {
@@ -1054,7 +1397,33 @@
       }
       if (key === "KeyF") eatFood();
       if (key === "KeyQ") fuelFire();
+      if (key === "KeyU") upgradeCampfire();
       if (key === "KeyX") cookFood();
+    }
+
+    function upgradeCampfire() {
+      if (!nearCampfire()) {
+        message("Stand near the campfire to upgrade it.");
+        return;
+      }
+      if (camp.level >= 4) {
+        message("Campfire is fully upgraded.");
+        return;
+      }
+      const cost = campfireUpgradeCosts[camp.level];
+      for (const [item, amount] of Object.entries(cost)) {
+        if (player.inv[item] < amount) {
+          message(`Need ${amount} ${item} for campfire level ${camp.level + 1}.`);
+          return;
+        }
+      }
+      for (const [item, amount] of Object.entries(cost)) player.inv[item] -= amount;
+      camp.level++;
+      camp.fireFuel = 100;
+      camp.r += 22;
+      addLog(`Campfire upgraded to level ${camp.level}. New map areas unlocked.`);
+      const unlocked = locations.filter(l => l.level === camp.level).map(l => l.name).join(", ");
+      if (unlocked) message(`Unlocked: ${unlocked}.`, 4);
     }
 
     function buildAtTable(slot) {
@@ -1157,7 +1526,7 @@
     function useMed() {
       if (player.inv.med <= 0 || player.health >= 100) return;
       player.inv.med--;
-      player.health = Math.min(100, player.health + 42);
+      player.health = Math.min(100, player.health + 42 + player.upgrades.pack * 8);
       addLog("Used a med pack.");
     }
 
@@ -1171,9 +1540,9 @@
         return;
       }
       player.inv.cookedFood--;
-      player.hunger = Math.min(100, player.hunger + 38);
-      player.health = Math.min(100, player.health + 10);
-      player.stamina = Math.min(100, player.stamina + 24);
+      player.hunger = Math.min(100, player.hunger + 38 + player.upgrades.pack * 6);
+      player.health = Math.min(100, player.health + 10 + player.upgrades.pack * 3);
+      player.stamina = Math.min(100, player.stamina + 24 + player.upgrades.pack * 4);
       addLog("Ate cooked food.");
     }
 
@@ -1194,11 +1563,37 @@
       spark(z.x, z.y, "#8fcf6d", 8);
         if (z.hp <= 0) {
           removeFrom(zombies, z);
-        addLog("Killed zombie.");
-        player.coins += Math.random() < .3 ? 1 : 0;
-        if (Math.random() < .45) player.inv.scrap += 1;
-        if (Math.random() < .12) player.reserveAmmo += 3;
-        if (Math.random() < .08) tools[4].count++;
+        const rewards = [];
+        if (z.type === "cultist") {
+          player.coins += 2;
+          rewards.push("2 coins");
+          if (Math.random() < .28) {
+            state.diamonds += 1;
+            rewards.push("1 diamond");
+          }
+          if (Math.random() < .45) {
+            player.inv.gems += 1;
+            rewards.push("1 gem");
+          }
+        }
+        if (Math.random() < .3) {
+          player.coins += 1;
+          rewards.push("1 coin");
+        }
+        if (Math.random() < .45) {
+          player.inv.scrap += 1;
+          rewards.push("1 scrap");
+        }
+        if (Math.random() < .12) {
+          player.reserveAmmo += 3;
+          rewards.push("3 ammo");
+        }
+        if (Math.random() < .08) {
+          tools[4].count++;
+          rewards.push("1 fire bomb");
+        }
+        addLog(rewards.length ? `Killed ${z.type === "cultist" ? "cultist" : "zombie"}. Found ${rewards.join(", ")}.` : `Killed ${z.type === "cultist" ? "cultist" : "zombie"}.`);
+        renderStartClasses();
       }
     }
 
@@ -1258,6 +1653,10 @@
         player.inv.fuel += madeFuel;
         if (madeFood || madeFuel) addLog(`Machines produced ${madeFood} raw food and ${madeFuel} fuel.`);
         addLog(`Day ${state.day} begins. The woods restocked.`);
+        if (state.day >= state.nextPeltTraderDay) {
+          spawnPeltTrader();
+          state.nextPeltTraderDay = state.day + 3 + Math.floor(Math.random() * 2);
+        }
       }
 
       movePlayer(dt);
@@ -1286,7 +1685,8 @@
     }
 
     function updateWorld(dt, oldPhase) {
-      camp.fireFuel = Math.max(0, camp.fireFuel - dt * (phase() === "night" ? 1.25 : .45));
+      const fireKeeper = 1 - Math.min(.45, player.upgrades.fire * .1);
+      camp.fireFuel = Math.max(0, camp.fireFuel - dt * (phase() === "night" ? 1.25 : .45) * fireKeeper);
       camp.fire = 44 + camp.fireFuel * .42;
       if (camp.fireFuel <= 0) player.health = Math.max(1, player.health - 2 * dt);
 
@@ -1308,9 +1708,11 @@
 
       for (const trader of [...traders]) {
         trader.timer -= dt;
-        const angle = Math.atan2(camp.y - trader.y, camp.x - trader.x);
-        trader.x += Math.cos(angle) * 24 * dt;
-        trader.y += Math.sin(angle) * 24 * dt;
+        if (trader.type !== "pelt") {
+          const angle = Math.atan2(camp.y - trader.y, camp.x - trader.x);
+          trader.x += Math.cos(angle) * 24 * dt;
+          trader.y += Math.sin(angle) * 24 * dt;
+        }
         if (trader.timer <= 0) removeFrom(traders, trader);
       }
 
@@ -1374,7 +1776,7 @@
             player.inv.pelts += 1;
             removeFrom(animals, a);
             b.life = 0;
-            addLog("Collected raw meat.");
+            addLog("Collected raw meat and a pelt.");
             break;
           }
         }
@@ -1435,6 +1837,7 @@
         ui.startScreen.querySelector("h1").textContent = `Survived ${state.day} day${state.day === 1 ? "" : "s"}`;
         ui.startScreen.querySelector("p").textContent = "The campfire went cold.";
         ui.startBtn.textContent = "Try Again";
+        renderStartClasses();
       }
     }
 
@@ -1448,6 +1851,7 @@
       ui.hungerText.textContent = Math.ceil(player.hunger);
       ui.ammoText.textContent = `${player.ammo}/${player.reserveAmmo}`;
       ui.phaseText.textContent = `Day ${state.day} - ${phaseName()}`;
+      ui.dayCounter.textContent = `Day ${state.day} | Campfire ${campfirePercent()}% | Level ${camp.level}/4 | Diamonds ${state.diamonds}`;
       ui.objectiveText.textContent = phase() === "day"
         ? "Gather supplies, hunt, craft ammo, and trade before dark."
         : `Defend camp. Zombies nearby: ${zombies.length}`;
@@ -1460,11 +1864,12 @@
         ["Scrap", player.inv.scrap],
         ["Fuel", player.inv.fuel],
         ["Gems", player.inv.gems],
+        ["Diamonds", state.diamonds],
         ["Meds", player.inv.med],
         ["Pelts", player.inv.pelts],
         ["Coins", player.coins],
         ["Chests", chests.length],
-        ["Fire", Math.floor(camp.fireFuel)]
+        ["Fire", `${campfirePercent()}%`]
       ];
       ui.inventoryGrid.innerHTML = inv.map(([k, v]) => `<div class="inv-item"><span>${k}</span><b>${v}</b></div>`).join("");
       ui.buildMenu.classList.toggle("open", state.buildOpen);
@@ -1480,7 +1885,7 @@
         if (tool.id === "food") count = player.inv.cookedFood;
         if (tool.id === "flare") count = tool.count;
         return `<button class="slot ${player.tool === i ? "active" : ""}" data-slot="${i}" title="${tool.name}">
-          <small>${i + 1}</small>${tool.icon}<span>${count}</span>
+          <small>${i + 1}</small>${tool.icon}<b class="slot-label">${tool.name}</b><span class="slot-count">${count}</span>
         </button>`;
       }).join("");
     }
@@ -1494,6 +1899,7 @@
       ctx.save();
       ctx.translate(-camera.x, -camera.y);
       drawGround();
+      drawLocations();
       drawCamp();
       drawItems();
       drawEntities();
@@ -1513,6 +1919,64 @@
         ctx.lineTo(x + 180, world.h);
         ctx.stroke();
       }
+    }
+
+    function drawLocations() {
+      for (const location of locations) {
+        const unlocked = areaUnlocked(location);
+        ctx.globalAlpha = unlocked ? 1 : .42;
+        ctx.fillStyle = location.kind === "stronghold" ? "#3b3143" : location.kind === "fort" ? "#4a4d4d" : "#594432";
+        circle(location.x, location.y, location.r);
+        ctx.strokeStyle = unlocked ? "#f0d075" : "#8d8b7a";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(location.x, location.y, location.r + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        if (location.kind === "houses") drawHouses(location);
+        if (location.kind === "fort") drawFort(location);
+        if (location.kind === "stronghold") drawStronghold(location);
+        ctx.fillStyle = unlocked ? "#f6f1df" : "#c8bea4";
+        ctx.font = "13px Segoe UI, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(unlocked ? location.name : `${location.name} L${location.level}`, location.x, location.y - location.r - 14);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawHouses(location) {
+      for (let i = -1; i <= 1; i++) {
+        const x = location.x + i * 32;
+        ctx.fillStyle = "#76593b";
+        rect(x - 15, location.y - 10, 30, 26, 3);
+        ctx.fillStyle = "#3e2b22";
+        ctx.beginPath();
+        ctx.moveTo(x - 18, location.y - 10);
+        ctx.lineTo(x, location.y - 27);
+        ctx.lineTo(x + 18, location.y - 10);
+        ctx.fill();
+      }
+    }
+
+    function drawFort(location) {
+      ctx.fillStyle = "#626968";
+      rect(location.x - 48, location.y - 34, 96, 68, 4);
+      ctx.fillStyle = "#2f3435";
+      rect(location.x - 14, location.y + 4, 28, 30, 3);
+      ctx.strokeStyle = "#aeb3ad";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(location.x - 55, location.y - 41, 110, 82);
+    }
+
+    function drawStronghold(location) {
+      ctx.fillStyle = "#2e2636";
+      rect(location.x - 54, location.y - 40, 108, 80, 5);
+      ctx.fillStyle = "#6d496e";
+      circle(location.x, location.y - 4, 28);
+      ctx.strokeStyle = "#9ddcff";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(location.x, location.y - 4, 36, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     function drawCamp() {
@@ -1661,21 +2125,51 @@
         ctx.strokeRect(c.x - 13, c.y - 13, 26, 26);
       }
       for (const d of drops) {
-        ctx.fillStyle = d.color;
-        circle(d.x, d.y, d.r);
+        if (d.kind === "scrap") drawScrapDrop(d);
+        else {
+          ctx.fillStyle = d.color;
+          circle(d.x, d.y, d.r);
+        }
       }
+    }
+
+    function drawScrapDrop(d) {
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.spin);
+      ctx.fillStyle = "#aeb3ad";
+      rect(-12, -5, 19, 10, 2);
+      ctx.fillStyle = "#737b79";
+      rect(-3, -10, 15, 8, 2);
+      ctx.fillStyle = "#d9d3bc";
+      rect(-8, 3, 18, 6, 2);
+      ctx.strokeStyle = "#f1e4aa";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-10, -2);
+      ctx.lineTo(8, -6);
+      ctx.moveTo(-2, 6);
+      ctx.lineTo(11, 1);
+      ctx.stroke();
+      ctx.restore();
     }
 
     function drawEntities() {
       for (const trader of traders) {
-        ctx.fillStyle = trader.sold ? "#77766d" : "#c9a55b";
+        ctx.fillStyle = trader.sold ? "#77766d" : trader.type === "pelt" ? "#b98764" : "#c9a55b";
         circle(trader.x, trader.y, trader.r);
-        ctx.fillStyle = "#303036";
+        ctx.fillStyle = trader.type === "pelt" ? "#5b3d30" : "#303036";
         rect(trader.x - 14, trader.y + 7, 28, 18, 4);
+        if (trader.type === "pelt") {
+          ctx.fillStyle = "#e5c08a";
+          circle(trader.x + 13, trader.y - 3, 7);
+          ctx.fillStyle = "#7a4e35";
+          rect(trader.x - 24, trader.y + 15, 48, 9, 3);
+        }
         ctx.fillStyle = "#f6f1df";
         ctx.font = "12px Segoe UI, Arial";
         ctx.textAlign = "center";
-        ctx.fillText("Trader", trader.x, trader.y - 26);
+        ctx.fillText(trader.type === "pelt" ? "Pelt Trader" : "Trader", trader.x, trader.y - 26);
       }
       for (const chest of chests) {
         ctx.fillStyle = "#7b5633";
@@ -1699,11 +2193,18 @@
         circle(a.x + 7, a.y - 5, 4);
       }
       for (const z of zombies) {
-        ctx.fillStyle = "#456b44";
+        ctx.fillStyle = z.type === "cultist" ? "#6d3b62" : "#456b44";
         circle(z.x, z.y, z.r);
-        ctx.fillStyle = "#263322";
+        ctx.fillStyle = z.type === "cultist" ? "#1f1622" : "#263322";
         circle(z.x - 6, z.y - 4, 3);
         circle(z.x + 6, z.y - 4, 3);
+        if (z.type === "cultist") {
+          ctx.strokeStyle = "#9ddcff";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(z.x, z.y, z.r + 5, .2, Math.PI * 1.35);
+          ctx.stroke();
+        }
       }
       for (const b of bullets) {
         ctx.strokeStyle = "#ffd66b";
@@ -1766,6 +2267,7 @@
     }
 
     function reset() {
+      const chosenClass = classes.find(c => c.id === state.selectedClass) || classes[0];
       Object.assign(player, {
         x: camp.x + 38,
         y: camp.y + 20,
@@ -1777,7 +2279,8 @@
         reserveAmmo: 36,
         coins: 5,
         inv: { wood: 0, rawFood: 1, cookedFood: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
-        builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 }
+        builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 },
+        upgrades: { axe: 0, pistol: 0, pack: 0, fire: 0 }
       });
       Object.assign(state, {
         running: true,
@@ -1789,6 +2292,7 @@
         swingTimer: 0,
         spawnTimer: 0,
         traderTimer: 18,
+        nextPeltTraderDay: 3,
         buildOpen: false,
         tradeOpen: false,
         activeTrader: null,
@@ -1806,6 +2310,9 @@
       camp.barricade = 0;
       camp.fireFuel = 70;
       camp.fire = 72;
+      camp.level = 1;
+      camp.r = 135;
+      for (const location of locations) location.searchedDay = 0;
       zombies.length = 0;
       bullets.length = 0;
       drops.length = 0;
@@ -1813,9 +2320,10 @@
       chests.length = 0;
       particles.length = 0;
       tools[4].count = 0;
+      chosenClass.apply();
       spawnResources();
       createChest();
-      addLog("Day 1 begins.");
+      addLog(`Day 1 begins as ${chosenClass.name}.`);
       renderNotices();
       renderTrade();
       renderChest();
@@ -1859,9 +2367,14 @@
       moveChestItem(action, item);
     });
     ui.startBtn.addEventListener("click", reset);
+    ui.classGrid.addEventListener("click", (e) => {
+      const button = e.target.closest("[data-class]");
+      if (button) selectClass(button.dataset.class);
+    });
 
     resize();
     spawnResources();
+    renderStartClasses();
     updateUi();
     requestAnimationFrame(loop);
   </script>
