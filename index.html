@@ -1011,9 +1011,9 @@
       bots.length = 0;
       if (!state.coOp) return;
       bots.push(
-        { name: "Rowan", role: "Rifle", x: player.x - 34, y: player.y + 28, r: 14, color: "#6aa6dd", cooldown: .4, healTimer: 0, gatherTimer: 0 },
-        { name: "Patch", role: "Medic", x: player.x + 38, y: player.y + 22, r: 14, color: "#64c964", cooldown: 1.2, healTimer: 4, gatherTimer: 0 },
-        { name: "Sparks", role: "Builder", x: player.x, y: player.y - 42, r: 14, color: "#e5b84f", cooldown: .8, healTimer: 0, gatherTimer: 5 }
+        { name: "Rowan", role: "Rifle", x: camp.x - 82, y: camp.y + 24, r: 14, color: "#6aa6dd", hp: 100, cooldown: .4, job: "Guard", jobTimer: 0, target: null, guardAngle: -2.35 },
+        { name: "Patch", role: "Medic", x: camp.x + 64, y: camp.y - 46, r: 14, color: "#64c964", hp: 100, cooldown: 1.2, job: "Tend camp", jobTimer: 0, target: null, guardAngle: -.65 },
+        { name: "Sparks", role: "Builder", x: camp.x + 28, y: camp.y + 92, r: 14, color: "#e5b84f", hp: 100, cooldown: .8, job: "Scavenge", jobTimer: 0, target: null, guardAngle: 1.35 }
       );
       addLog("Co-op bots joined the camp.");
     }
@@ -1819,58 +1819,157 @@
     }
 
     function updateBots(dt) {
-      for (let i = 0; i < bots.length; i++) {
-        const bot = bots[i];
-        const ring = 42 + i * 22;
-        const goalAngle = performance.now() / 900 + i * Math.PI * 2 / Math.max(1, bots.length);
-        let goal = { x: player.x + Math.cos(goalAngle) * ring, y: player.y + Math.sin(goalAngle) * ring };
-        const target = zombies
-          .filter(z => Math.hypot(z.x - bot.x, z.y - bot.y) < 330)
-          .sort((a, b) => Math.hypot(a.x - bot.x, a.y - bot.y) - Math.hypot(b.x - bot.x, b.y - bot.y))[0];
-        if (target) {
-          goal = { x: target.x - Math.sign(target.x - bot.x || 1) * 140, y: target.y - Math.sign(target.y - bot.y || 1) * 90 };
-          bot.cooldown -= dt;
-          if (bot.cooldown <= 0) {
-            hitZombie(target, bot.role === "Rifle" ? 2 : 1);
-            spark(bot.x, bot.y, bot.color, 4);
-            bot.cooldown = bot.role === "Rifle" ? .55 : .95;
-          }
-        }
-        const angle = Math.atan2(goal.y - bot.y, goal.x - bot.x);
-        const speed = target ? 170 : 135;
-        bot.x = clamp(bot.x + Math.cos(angle) * speed * dt, 18, world.w - 18);
-        bot.y = clamp(bot.y + Math.sin(angle) * speed * dt, 18, world.h - 18);
+      for (const bot of bots) {
+        bot.jobTimer = Math.max(0, bot.jobTimer - dt);
+        bot.cooldown = Math.max(0, bot.cooldown - dt);
+        const threat = nearestTo(bot, zombies, bot.role === "Rifle" ? 390 : 310);
+        const playerThreat = nearestTo(player, zombies, 190);
+        const tooFar = Math.hypot(bot.x - player.x, bot.y - player.y) > 620;
 
-        if (bot.role === "Medic") {
-          bot.healTimer -= dt;
-          if (bot.healTimer <= 0) {
-            if (player.health < 78) {
-              player.health = Math.min(100, player.health + 16);
-              addLog("Patch healed you.");
-            }
-            if (camp.fireFuel < 45 && player.inv.wood > 0) {
-              player.inv.wood--;
-              camp.fireFuel = Math.min(100, camp.fireFuel + 18);
-              addLog("Patch fed the campfire.");
-            }
-            bot.healTimer = 7;
-          }
+        if (threat || (playerThreat && Math.hypot(bot.x - player.x, bot.y - player.y) < 420)) {
+          bot.job = playerThreat && bot.role !== "Builder" ? "Cover player" : "Fight";
+          bot.target = threat || playerThreat;
+          bot.jobTimer = .8;
+        } else if (tooFar) {
+          bot.job = "Regroup";
+          bot.target = { x: player.x, y: player.y };
+          bot.jobTimer = 1.5;
+        } else if (bot.role === "Medic" && (player.health < 82 || camp.fireFuel < 48)) {
+          bot.job = player.health < 82 ? "Heal player" : "Fuel fire";
+          bot.target = player.health < 82 ? player : camp;
+          bot.jobTimer = 2;
+        } else if (bot.jobTimer <= 0 || !bot.target || targetGone(bot)) {
+          chooseBotJob(bot);
         }
 
-        if (bot.role === "Builder") {
-          bot.gatherTimer -= dt;
-          if (bot.gatherTimer <= 0 && phase() === "day") {
-            if (Math.random() < .55) {
-              player.inv.wood += 2;
-              addLog("Sparks gathered 2 wood.");
-            } else {
-              player.inv.scrap += 1;
-              addLog("Sparks found 1 scrap.");
-            }
-            bot.gatherTimer = 12;
-          }
+        runBotJob(bot, dt);
+      }
+    }
+
+    function chooseBotJob(bot) {
+      if (phase() === "night") {
+        bot.job = "Guard";
+        bot.target = {
+          x: camp.x + Math.cos(bot.guardAngle) * (camp.r + 82),
+          y: camp.y + Math.sin(bot.guardAngle) * (camp.r + 82)
+        };
+        bot.jobTimer = rand(3, 6);
+        return;
+      }
+
+      if (bot.role === "Rifle") {
+        const unlocked = locations.filter(areaUnlocked).sort((a, b) => dist(player, a) - dist(player, b))[0];
+        bot.job = unlocked && Math.random() < .45 ? "Scout landmark" : "Patrol camp";
+        bot.target = unlocked || {
+          x: camp.x + Math.cos(bot.guardAngle) * (camp.r + 120),
+          y: camp.y + Math.sin(bot.guardAngle) * (camp.r + 120)
+        };
+        bot.jobTimer = rand(4, 7);
+        return;
+      }
+
+      if (bot.role === "Medic") {
+        bot.job = camp.fireFuel < 72 && player.inv.wood > 0 ? "Fuel fire" : "Tend camp";
+        bot.target = bot.job === "Fuel fire" ? camp : { x: camp.x + 64, y: camp.y - 46 };
+        bot.jobTimer = rand(3, 6);
+        return;
+      }
+
+      const crate = nearestTo(bot, crates, 520);
+      const tree = nearestTo(bot, trees, 520);
+      bot.job = crate ? "Loot crate" : tree ? "Chop tree" : "Haul supplies";
+      bot.target = crate || tree || { x: camp.x - 90, y: camp.y + 78 };
+      bot.jobTimer = rand(5, 8);
+    }
+
+    function runBotJob(bot, dt) {
+      if (bot.job === "Fight" || bot.job === "Cover player") {
+        if (bot.target && zombies.includes(bot.target)) {
+          const standOff = bot.role === "Rifle" ? 155 : 105;
+          const away = Math.atan2(bot.y - bot.target.y, bot.x - bot.target.x);
+          moveBotToward(bot, {
+            x: bot.target.x + Math.cos(away) * standOff,
+            y: bot.target.y + Math.sin(away) * standOff
+          }, dt, 185);
+          botShoot(bot, bot.target);
+        }
+        return;
+      }
+
+      moveBotToward(bot, bot.target, dt, bot.job === "Regroup" ? 215 : 135);
+      if (dist(bot, bot.target) > 34) return;
+
+      if (bot.job === "Heal player" && player.health < 96) {
+        player.health = Math.min(100, player.health + 18);
+        addLog("Patch patched you up.");
+        bot.jobTimer = 4;
+      }
+      if (bot.job === "Fuel fire" && player.inv.wood > 0 && camp.fireFuel < 92) {
+        player.inv.wood--;
+        camp.fireFuel = Math.min(100, camp.fireFuel + 20);
+        addLog("Patch added wood to the fire.");
+        bot.jobTimer = 5;
+      }
+      if (bot.job === "Loot crate" && crates.includes(bot.target)) {
+        player.inv.scrap += 2;
+        if (Math.random() < .35) player.reserveAmmo += 4;
+        removeFrom(crates, bot.target);
+        spark(bot.target.x, bot.target.y, "#d6d0bd", 10);
+        addLog("Sparks looted a crate.");
+        bot.target = null;
+        bot.jobTimer = 1;
+      }
+      if (bot.job === "Chop tree" && trees.includes(bot.target)) {
+        player.inv.wood += 3;
+        removeFrom(trees, bot.target);
+        spark(bot.target.x, bot.target.y, "#dca95a", 10);
+        addLog("Sparks chopped wood.");
+        bot.target = null;
+        bot.jobTimer = 1;
+      }
+      if (bot.job === "Haul supplies") {
+        player.inv.wood += 1;
+        player.inv.scrap += 1;
+        addLog("Sparks hauled camp supplies.");
+        bot.jobTimer = 8;
+      }
+    }
+
+    function moveBotToward(bot, goal, dt, speed) {
+      if (!goal) return;
+      const dx = goal.x - bot.x;
+      const dy = goal.y - bot.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 4) return;
+      const step = Math.min(d, speed * dt);
+      bot.x = clamp(bot.x + dx / d * step, 18, world.w - 18);
+      bot.y = clamp(bot.y + dy / d * step, 18, world.h - 18);
+    }
+
+    function botShoot(bot, target) {
+      if (bot.cooldown > 0 || !target) return;
+      hitZombie(target, bot.role === "Rifle" ? 2 : 1);
+      spark(bot.x, bot.y, bot.color, 4);
+      bot.cooldown = bot.role === "Rifle" ? .55 : .95;
+    }
+
+    function targetGone(bot) {
+      if (!bot.target) return true;
+      if ((bot.job === "Loot crate" && !crates.includes(bot.target)) || (bot.job === "Chop tree" && !trees.includes(bot.target))) return true;
+      return false;
+    }
+
+    function nearestTo(origin, list, range) {
+      let best = null;
+      let bestD = range;
+      for (const item of list) {
+        const d = Math.hypot(origin.x - item.x, origin.y - item.y);
+        if (d < bestD) {
+          best = item;
+          bestD = d;
         }
       }
+      return best;
     }
 
     function updateCombat(dt) {
@@ -2383,6 +2482,8 @@
         ctx.font = "11px Segoe UI, Arial";
         ctx.textAlign = "center";
         ctx.fillText(bot.name, bot.x, bot.y - 22);
+        ctx.fillStyle = "#c8bea4";
+        ctx.fillText(bot.job, bot.x, bot.y + 31);
       }
       for (const z of zombies) {
         ctx.fillStyle = z.type === "cultist" ? "#6d3b62" : "#456b44";
