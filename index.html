@@ -554,23 +554,24 @@
       </section>
     </div>
 
-    <div class="panel center-tip" id="tip">WASD move. Click to use equipped item. E interacts. 1-6 swaps tools.</div>
+    <div class="panel center-tip" id="tip">WASD move. Click to use equipped item. E interacts. 1-7 swaps tools.</div>
 
     <section class="panel guide" id="guide">
       <h2>What Everything Does</h2>
       <p><b>Axe:</b> chop trees/crates and melee zombies.</p>
       <p><b>Pistol:</b> shoot zombies or hunt animals. Press R to reload.</p>
+      <p><b>Flashlight:</b> stuns night bosses for a few seconds. It does not kill them.</p>
       <p><b>Rocket:</b> Soldier starts with a rocket launcher. Rockets explode and clear groups.</p>
       <p><b>Food/Med:</b> heal. Food also restores energy.</p>
-      <p><b>Raw food:</b> goes in your sack. Cook it at the fire with X.</p>
+      <p><b>Raw food:</b> goes in your sack. Cook it at the fire with X, or make stew after crafting a pot.</p>
       <p><b>Cooked food:</b> fills hunger and gives a small heal.</p>
       <p><b>Wood:</b> fuel the fire and build base parts.</p>
       <p><b>Scrap:</b> metal used for ammo, traps, rigs, and sentries.</p>
       <p><b>Fuel:</b> powers oil rigs and sentry guns.</p>
       <p><b>Engineer:</b> starts with an improved sentry and extra fuel.</p>
-      <p><b>Q:</b> add wood to the campfire when near camp.</p>
+      <p><b>Q:</b> add wood or a carried fuel barrel to the campfire when near camp.</p>
       <p><b>U:</b> upgrade the campfire to unlock houses, the army fort, and the stronghold.</p>
-      <p><b>Crafting table:</b> press E beside the table, then 1-5 to build.</p>
+      <p><b>Crafting table:</b> press E beside the table, then 1-7 to build.</p>
     </section>
 
     <section class="panel build-menu" id="buildMenu">
@@ -578,9 +579,10 @@
       <div class="recipe"><b>1 Wall:</b> 10 wood, 2 scrap. Blocks zombie bites at camp.</div>
       <div class="recipe"><b>2 Spike Trap:</b> 8 wood, 3 scrap. Hurts zombies near camp.</div>
       <div class="recipe"><b>3 Food Generator:</b> 12 wood, 4 scrap, 2 cooked food. Makes raw food each day.</div>
-      <div class="recipe"><b>4 Oil Rig:</b> 8 wood, 8 scrap, 2 fuel. Makes fuel each day.</div>
+      <div class="recipe"><b>4 Oil Rig:</b> 8 wood, 8 scrap, 2 fuel. Drops fuel barrels over time.</div>
       <div class="recipe"><b>5 Sentry Gun:</b> 18 scrap, 3 fuel, 12 coins. Shoots zombies.</div>
       <div class="recipe"><b>6 Chest:</b> 12 wood, 2 scrap. Stores sack items at camp.</div>
+      <div class="recipe"><b>7 Cooking Pot:</b> 8 scrap, 4 wood. Lets X cook hearty stew at the fire.</div>
       <div class="recipe"><b>Campfire U:</b> upgrade near the fire. L2 costs 18 wood, 6 scrap, 2 fuel. Later levels cost more.</div>
     </section>
 
@@ -600,7 +602,7 @@
       <section class="panel log" id="log"></section>
       <nav class="panel hotbar" id="hotbar" aria-label="Hotbar"></nav>
       <section class="panel craft">
-        <b>Quick craft:</b> C wall repair, V ammo, B med pack, F eat cooked food, X cook raw food, Q fuel fire, U upgrade fire. E opens the crafting table when close.
+        <b>Quick craft:</b> C wall repair, V ammo, B med pack, F eat food/stew, X cook or stew, Q fuel fire, U upgrade fire. E opens the crafting table or picks up barrels.
       </section>
     </div>
   </div>
@@ -615,10 +617,11 @@
         <h2>Beginner Guide</h2>
         <ul>
           <li><b>Move:</b> WASD. Sprint with Shift. Aim with the mouse.</li>
-          <li><b>Use tools:</b> click with the hotbar item equipped. 1-6 switches tools.</li>
-          <li><b>Survive:</b> keep the campfire fueled with Q, eat cooked food with F, and cook raw food at the fire with X.</li>
+          <li><b>Use tools:</b> click with the hotbar item equipped. 1-7 switches tools.</li>
+          <li><b>Survive:</b> carry fuel barrels or add wood to the campfire with Q, eat with F, and cook at the fire with X.</li>
           <li><b>Gather:</b> chop trees and crates with the axe. Hunt animals for raw food and pelts.</li>
-          <li><b>Build:</b> press E at the workbench, then number keys to build walls, traps, generators, oil rigs, sentries, and chests.</li>
+          <li><b>Build:</b> press E at the workbench, then number keys to build walls, traps, generators, oil rigs, sentries, chests, and a cooking pot.</li>
+          <li><b>Boss nights:</b> on certain nights an unkillable boss hunts you. Use the flashlight to stun it and run.</li>
           <li><b>Upgrade:</b> stand near the fire and press U to upgrade the campfire. Higher campfire levels reveal houses, the army fort, and the stronghold.</li>
           <li><b>Trade:</b> wandering traders buy and sell supplies. The pelt trader visits camp every few days and trades pelts for upgrades.</li>
           <li><b>Diamonds:</b> stronghold runs can drop diamonds. Spend diamonds here before a run to buy a class.</li>
@@ -681,6 +684,7 @@
       spawnTimer: 0,
       traderTimer: 18,
       nextPeltTraderDay: 3,
+      bossSpawnedDay: 0,
       buildOpen: false,
       tradeOpen: false,
       activeTrader: null,
@@ -688,9 +692,12 @@
       activeChest: null,
       generatorTimer: 20,
       sentryTimer: 0,
+      oilTimer: 28,
       cooking: false,
       cookingTimer: 0,
       cookingTotal: 2.8,
+      cookingKind: "meat",
+      flashlightTimer: 0,
       diamonds: 0,
       selectedClass: "survivor",
       ownedClasses: ["survivor"],
@@ -715,9 +722,10 @@
       ammo: 12,
       reserveAmmo: 36,
       rockets: 0,
+      carrying: null,
       coins: 5,
-      inv: { wood: 0, rawFood: 1, cookedFood: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
-      builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 },
+      inv: { wood: 0, rawFood: 1, cookedFood: 2, stew: 0, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
+      builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0, pot: 0 },
       upgrades: { axe: 0, pistol: 0, pack: 0, fire: 0, sentry: 0 }
     };
 
@@ -752,7 +760,8 @@
       { id: "med", name: "Med Pack", icon: "➕" },
       { id: "food", name: "Food", icon: "🥫" },
       { id: "flare", name: "Fire Bomb", icon: "🔥", count: 0 },
-      { id: "rocket", name: "Rocket", icon: "🚀" }
+      { id: "rocket", name: "Rocket", icon: "🚀" },
+      { id: "flashlight", name: "Flashlight", icon: "🔦" }
     ];
 
     const trees = [];
@@ -760,8 +769,10 @@
     const crates = [];
     const animals = [];
     const zombies = [];
+    const bosses = [];
     const bullets = [];
     const rockets = [];
+    const barrels = [];
     const drops = [];
     const traders = [];
     const chests = [];
@@ -877,23 +888,26 @@
     }
 
     function currentTip() {
-      if (state.buildOpen) return "Crafting table open: 1 wall, 2 trap, 3 food generator, 4 oil rig, 5 sentry gun, 6 chest.";
+      if (state.buildOpen) return "Crafting table open: 1 wall, 2 trap, 3 food generator, 4 oil rig, 5 sentry gun, 6 chest, 7 cooking pot.";
       if (state.tradeOpen) return "Trader shop open. Use the buttons to buy or sell, or press E to close.";
       if (state.chestOpen) return "Chest open. Use the buttons to deposit or withdraw sack items.";
       const location = nearest(locations, 95);
       if (location) return areaUnlocked(location) ? `Press E to search ${location.name}.` : `Upgrade the campfire to level ${location.level} to unlock ${location.name}.`;
       if (nearTable()) return "Press E to open the crafting table.";
       if (nearest(chests, 58)) return "Press E to open this storage chest.";
-      if (nearCampfire() && state.cooking) return "Cooking raw meat...";
+      if (player.carrying === "barrel" && nearCampfire()) return "Press E or Q to dump this fuel barrel into the campfire.";
+      if (nearest(barrels, 48)) return "Press E to pick up this fuel barrel, then bring it to the campfire.";
+      if (nearCampfire() && state.cooking) return state.cookingKind === "stew" ? "Stew is simmering..." : "Cooking raw meat...";
+      if (nearCampfire() && player.builds.pot > 0 && player.inv.rawFood >= 2) return "Press X to cook stew in the pot. Stew is stronger than cooked food.";
       if (nearCampfire() && player.inv.rawFood > 0) return "You have raw meat in your sack. Press X to cook it at the fire.";
-      if (nearCampfire()) return "Campfire heals you. Q fuels it with wood. X cooks raw food. U upgrades the fire.";
+      if (nearCampfire()) return "Campfire heals you. Q fuels it with wood, fuel, or carried barrels. X cooks food. U upgrades the fire.";
       if (nearest(forage, 46)) return "Press E to forage berries or herbs.";
       if (nearest(animals, 50)) return "Press E to hunt, or shoot animals for raw food and pelts.";
       if (nearest(traders.filter(t => t.type === "pelt"), 62)) return "Press E by the pelt trader. Give 1 pelt, then choose one of 3 upgrades.";
       if (nearest(traders, 62)) return "Press E to open the wandering trader shop.";
       if (nearest(crates, 58)) return "Use the axe on crates to find ammo, scrap metal, fuel, med packs, or gems.";
       if (nearest(trees, 58)) return "Use the axe on trees to gather wood.";
-      return "WASD move. Click to use equipped item. E interacts. 1-6 swaps tools. Q fuels fire. U upgrades campfire.";
+      return "WASD move. Click to use equipped item. E interacts. 1-7 swaps tools. Q fuels fire. U upgrades campfire.";
     }
 
     function nearCampfire() {
@@ -1136,6 +1150,23 @@
     }
 
     function interact() {
+      if (player.carrying === "barrel" && nearCampfire()) {
+        dumpFuelBarrel();
+        return;
+      }
+
+      const barrel = nearest(barrels, 48);
+      if (barrel) {
+        if (player.carrying) {
+          message("You are already carrying something.");
+          return;
+        }
+        player.carrying = "barrel";
+        removeFrom(barrels, barrel);
+        addLog("Picked up a fuel barrel.");
+        return;
+      }
+
       const chest = nearest(chests, 58);
       if (chest) {
         toggleChest(chest);
@@ -1147,7 +1178,7 @@
         state.tradeOpen = false;
         state.chestOpen = false;
         state.activeChest = null;
-        message(state.buildOpen ? "Crafting table open. Press 1-6 to build." : "Crafting table closed.");
+        message(state.buildOpen ? "Crafting table open. Press 1-7 to build." : "Crafting table closed.");
         return;
       }
 
@@ -1388,7 +1419,7 @@
     }
 
     function blankStorage() {
-      return { wood: 0, rawFood: 0, cookedFood: 0, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 0, pelts: 0 };
+      return { wood: 0, rawFood: 0, cookedFood: 0, stew: 0, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 0, pelts: 0 };
     }
 
     function toggleChest(chest) {
@@ -1409,6 +1440,7 @@
         wood: "Wood",
         rawFood: "Raw meat",
         cookedFood: "Cooked food",
+        stew: "Stew",
         herbs: "Herbs",
         scrap: "Scrap",
         fuel: "Fuel",
@@ -1514,7 +1546,8 @@
         { name: "food generator", costs: { wood: 12, scrap: 4, cookedFood: 2 }, make: () => player.builds.foodGen++ },
         { name: "oil rig", costs: { wood: 8, scrap: 8, fuel: 2 }, make: () => player.builds.oilRig++ },
         { name: "sentry gun", costs: { scrap: 18, fuel: 3, coins: 12 }, make: () => player.builds.sentry++ },
-        { name: "storage chest", costs: { wood: 12, scrap: 2 }, make: () => createChest() }
+        { name: "storage chest", costs: { wood: 12, scrap: 2 }, make: () => createChest() },
+        { name: "cooking pot", costs: { scrap: 8, wood: 4 }, make: () => player.builds.pot++ }
       ];
       const recipe = recipes[slot];
       if (!recipe) return true;
@@ -1547,29 +1580,55 @@
 
     function fuelFire() {
       if (!nearCampfire()) {
-        message("Stand near the campfire to add wood.");
+        message("Stand near the campfire to add fuel.");
         return;
       }
-      if (player.inv.wood <= 0) {
-        message("Need wood to fuel the fire.");
+      if (player.carrying === "barrel") {
+        dumpFuelBarrel();
         return;
       }
-      player.inv.wood--;
-      camp.fireFuel = Math.min(100, camp.fireFuel + 22);
-      addLog("Added wood to the fire.");
+      if (player.inv.fuel > 0) {
+        player.inv.fuel--;
+        camp.fireFuel = Math.min(100, camp.fireFuel + 38);
+        addLog("Poured fuel into the fire.");
+        return;
+      }
+      if (player.inv.wood > 0) {
+        player.inv.wood--;
+        camp.fireFuel = Math.min(100, camp.fireFuel + 22);
+        addLog("Added wood to the fire.");
+        return;
+      }
+      message("Need wood, fuel, or a carried barrel to fuel the fire.");
+    }
+
+    function dumpFuelBarrel() {
+      player.carrying = null;
+      camp.fireFuel = Math.min(100, camp.fireFuel + 55);
+      spark(camp.x, camp.y, "#ffd66b", 24);
+      addLog("Dumped a fuel barrel into the campfire.");
     }
 
     function cookFood() {
       if (state.cooking) {
-        message("Already cooking raw meat.");
+        message("Already cooking.");
         return;
       }
       if (!nearCampfire()) {
-        message("Stand near the campfire to cook raw food.");
+        message("Stand near the campfire to cook.");
         return;
       }
       if (camp.fireFuel <= 5) {
         message("The fire needs fuel before you can cook.");
+        return;
+      }
+      if (player.builds.pot > 0 && player.inv.rawFood >= 2) {
+        state.cooking = true;
+        state.cookingKind = "stew";
+        state.cookingTotal = 5.5;
+        state.cookingTimer = 5.5;
+        message("Stew is simmering...", 1.4);
+        addLog("Started a pot of stew.");
         return;
       }
       if (player.inv.rawFood <= 0) {
@@ -1577,12 +1636,27 @@
         return;
       }
       state.cooking = true;
+      state.cookingKind = "meat";
+      state.cookingTotal = 2.8;
       state.cookingTimer = state.cookingTotal;
       message("Cooking raw meat...", 1.2);
       addLog("Started cooking raw meat.");
     }
 
     function finishCooking() {
+      if (state.cookingKind === "stew") {
+        if (player.inv.rawFood < 2) {
+          state.cooking = false;
+          message("Not enough raw meat left for stew.");
+          return;
+        }
+        player.inv.rawFood -= 2;
+        player.inv.stew++;
+        camp.fireFuel = Math.max(0, camp.fireFuel - 7);
+        state.cooking = false;
+        addLog("Cooked hearty stew.");
+        return;
+      }
       if (player.inv.rawFood <= 0) {
         state.cooking = false;
         message("No raw meat left to cook.");
@@ -1602,6 +1676,7 @@
       if (player.tool === 3) eatFood();
       if (player.tool === 4) fireBomb();
       if (player.tool === 5) shootRocket();
+      if (player.tool === 6) useFlashlight();
     }
 
     function useMed() {
@@ -1612,12 +1687,20 @@
     }
 
     function eatFood() {
-      if (player.inv.cookedFood <= 0) {
-        message("No cooked food in your sack.");
+      if (player.inv.stew <= 0 && player.inv.cookedFood <= 0) {
+        message("No cooked food or stew in your sack.");
         return;
       }
       if (player.hunger >= 100 && player.health >= 100) {
         message("You are already full.");
+        return;
+      }
+      if (player.inv.stew > 0) {
+        player.inv.stew--;
+        player.hunger = Math.min(100, player.hunger + 62 + player.upgrades.pack * 6);
+        player.health = Math.min(100, player.health + 20 + player.upgrades.pack * 3);
+        player.stamina = Math.min(100, player.stamina + 38 + player.upgrades.pack * 4);
+        addLog("Ate hearty stew.");
         return;
       }
       player.inv.cookedFood--;
@@ -1637,6 +1720,25 @@
       }
       spark(mx, my, "#ff884d", 38);
       addLog("Fire bomb thrown.");
+    }
+
+    function useFlashlight() {
+      if (state.flashlightTimer > 0) return;
+      state.flashlightTimer = .7;
+      const angle = Math.atan2(mouse.y + camera.y - player.y, mouse.x + camera.x - player.x);
+      let stunned = false;
+      for (const boss of bosses) {
+        const dx = boss.x - player.x;
+        const dy = boss.y - player.y;
+        const d = Math.hypot(dx, dy);
+        const diff = Math.abs(Math.atan2(Math.sin(Math.atan2(dy, dx) - angle), Math.cos(Math.atan2(dy, dx) - angle)));
+        if (d < 330 && diff < .48) {
+          boss.stunned = rand(2, 3);
+          stunned = true;
+          spark(boss.x, boss.y, "#f6f1df", 26);
+        }
+      }
+      message(stunned ? "Boss stunned by the flashlight." : "Flashlight beam fired.", 1.2);
     }
 
     function hitZombie(z, damage) {
@@ -1693,6 +1795,7 @@
       state.shootTimer = Math.max(0, state.shootTimer - dt);
       state.swingTimer = Math.max(0, state.swingTimer - dt);
       state.messageTimer = Math.max(0, state.messageTimer - dt);
+      state.flashlightTimer = Math.max(0, state.flashlightTimer - dt);
       for (const notice of state.notices) notice.time -= dt;
       const oldNoticeCount = state.notices.length;
       state.notices = state.notices.filter(n => n.time > 0);
@@ -1730,10 +1833,9 @@
       if (state.day !== oldDay) {
         spawnResources();
         const madeFood = player.builds.foodGen * 2;
-        const madeFuel = player.builds.oilRig * 2;
+        const madeFuel = 0;
         player.inv.rawFood += madeFood;
-        player.inv.fuel += madeFuel;
-        if (madeFood || madeFuel) addLog(`Machines produced ${madeFood} raw food and ${madeFuel} fuel.`);
+        if (madeFood) addLog(`Machines produced ${madeFood} raw food.`);
         addLog(`Day ${state.day} begins. The woods restocked.`);
         if (state.day >= state.nextPeltTraderDay) {
           spawnPeltTrader();
@@ -1799,6 +1901,8 @@
       }
 
       updateBots(dt);
+      updateOilRigs(dt);
+      updateBosses(dt);
 
       if (phase() === "day") {
         state.traderTimer -= dt;
@@ -1811,10 +1915,65 @@
       if (oldPhase === "day" && phase() === "night") {
         addLog("Night falls. Zombies are coming.");
         message("Night wave incoming. Stay near camp and keep firing.", 4);
+        maybeSpawnBoss();
       }
       if (oldPhase === "night" && phase() === "day") {
         addLog("Sunrise weakens the remaining zombies.");
         message("Daylight is making leftover zombies despawn.", 3);
+        bosses.length = 0;
+      }
+    }
+
+    function updateOilRigs(dt) {
+      if (player.builds.oilRig <= 0) return;
+      state.oilTimer -= dt * player.builds.oilRig;
+      if (state.oilTimer > 0) return;
+      state.oilTimer = Math.max(12, 34 - player.builds.oilRig * 3);
+      const i = barrels.length + player.builds.oilRig;
+      barrels.push({
+        x: camp.x + 126 + Math.cos(i * 1.7) * 44,
+        y: camp.y + 112 + Math.sin(i * 1.7) * 34,
+        r: 15
+      });
+      addLog("Oil rig dropped a fuel barrel.");
+    }
+
+    function bossNightSoon() {
+      return state.day >= 3 && state.day % 3 === 0;
+    }
+
+    function maybeSpawnBoss() {
+      if (state.day < 3 || state.day % 3 !== 0 || state.bossSpawnedDay === state.day) return;
+      state.bossSpawnedDay = state.day;
+      const side = Math.floor(rand(0, 4));
+      bosses.push({
+        x: side === 0 ? 20 : side === 1 ? world.w - 20 : rand(60, world.w - 60),
+        y: side === 2 ? 20 : side === 3 ? world.h - 20 : rand(60, world.h - 60),
+        r: 28,
+        speed: 188 + state.day * 5,
+        stunned: 0,
+        bite: 0
+      });
+      addLog("Something huge stepped out of the dark.");
+      message("Boss night. It cannot be killed. Flash it and run.", 5);
+    }
+
+    function updateBosses(dt) {
+      for (const boss of bosses) {
+        boss.stunned = Math.max(0, boss.stunned - dt);
+        if (boss.stunned <= 0) {
+          const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+          boss.x = clamp(boss.x + Math.cos(angle) * boss.speed * dt, 20, world.w - 20);
+          boss.y = clamp(boss.y + Math.sin(angle) * boss.speed * dt, 20, world.h - 20);
+        }
+        if (dist(boss, player) < boss.r + player.r + 5) {
+          boss.bite -= dt;
+          if (boss.bite <= 0) {
+            player.health -= 18;
+            boss.bite = .75;
+            spark(player.x, player.y, "#d95858", 14);
+          }
+        }
       }
     }
 
@@ -2132,13 +2291,14 @@
       ui.phaseText.textContent = `Day ${state.day} - ${phaseName()}`;
       ui.dayCounter.textContent = `Day ${state.day} | Campfire ${campfirePercent()}% | Level ${camp.level}/4 | Diamonds ${state.diamonds}`;
       ui.objectiveText.textContent = phase() === "day"
-        ? `Gather supplies, hunt, craft ammo, and trade before dark.${state.coOp ? " Co-op bots are active." : ""}${state.testing ? " Testing mode on." : ""}`
-        : `Defend camp. Zombies nearby: ${zombies.length}${state.coOp ? " | Bots helping" : ""}${state.testing ? " | Testing mode" : ""}`;
+        ? `Gather supplies, hunt, craft ammo, and trade before dark.${bossNightSoon() ? " Boss tonight." : ""}${state.coOp ? " Co-op bots are active." : ""}${state.testing ? " Testing mode on." : ""}`
+        : `Defend camp. Zombies nearby: ${zombies.length}${bosses.length ? " | Boss hunting" : ""}${state.coOp ? " | Bots helping" : ""}${state.testing ? " | Testing mode" : ""}`;
 
       const inv = [
         ["Wood", player.inv.wood],
         ["Raw", player.inv.rawFood],
         ["Cooked", player.inv.cookedFood],
+        ["Stew", player.inv.stew],
         ["Herbs", player.inv.herbs],
         ["Scrap", player.inv.scrap],
         ["Fuel", player.inv.fuel],
@@ -2148,6 +2308,7 @@
         ["Pelts", player.inv.pelts],
         ["Coins", player.coins],
         ["Rockets", player.rockets],
+        ["Carry", player.carrying || "-"],
         ["Chests", chests.length],
         ["Fire", `${campfirePercent()}%`]
       ];
@@ -2162,7 +2323,7 @@
       ui.hotbar.innerHTML = tools.map((tool, i) => {
         let count = "";
         if (tool.id === "med") count = player.inv.med;
-        if (tool.id === "food") count = player.inv.cookedFood;
+        if (tool.id === "food") count = player.inv.cookedFood + player.inv.stew;
         if (tool.id === "flare") count = tool.count;
         if (tool.id === "rocket") count = player.rockets;
         return `<button class="slot ${player.tool === i ? "active" : ""}" data-slot="${i}" title="${tool.name}">
@@ -2332,6 +2493,18 @@
         ctx.textAlign = "center";
         ctx.fillText(`${Math.ceil(state.cookingTimer)}s`, camp.x + 38, camp.y - 34);
       }
+      if (player.builds.pot > 0) {
+        ctx.fillStyle = "#2f3435";
+        circle(camp.x + 58, camp.y + 20, 15);
+        ctx.fillStyle = "#6b6f70";
+        rect(camp.x + 43, camp.y + 15, 30, 10, 4);
+        ctx.fillStyle = "#d7a35b";
+        circle(camp.x + 58, camp.y + 15, 9);
+        ctx.fillStyle = "#f6f1df";
+        ctx.font = "12px Segoe UI, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Pot", camp.x + 58, camp.y + 50);
+      }
 
       drawBuilds();
     }
@@ -2412,6 +2585,22 @@
           circle(d.x, d.y, d.r);
         }
       }
+      for (const barrel of barrels) drawFuelBarrel(barrel.x, barrel.y, 1);
+    }
+
+    function drawFuelBarrel(x, y, scale) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#8f512c";
+      rect(-13, -17, 26, 34, 5);
+      ctx.fillStyle = "#d98b42";
+      rect(-13, -10, 26, 6, 2);
+      rect(-13, 7, 26, 6, 2);
+      ctx.strokeStyle = "#f0d075";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-10, -14, 20, 28);
+      ctx.restore();
     }
 
     function drawScrapDrop(d) {
@@ -2499,6 +2688,22 @@
           ctx.stroke();
         }
       }
+      for (const boss of bosses) {
+        ctx.fillStyle = boss.stunned > 0 ? "#867b8f" : "#26202c";
+        circle(boss.x, boss.y, boss.r);
+        ctx.fillStyle = "#d95858";
+        circle(boss.x - 9, boss.y - 7, 4);
+        circle(boss.x + 9, boss.y - 7, 4);
+        ctx.strokeStyle = boss.stunned > 0 ? "#f6f1df" : "#6d3b62";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(boss.x, boss.y, boss.r + 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#f6f1df";
+        ctx.font = "12px Segoe UI, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(boss.stunned > 0 ? "Stunned" : "Boss", boss.x, boss.y - 42);
+      }
       for (const b of bullets) {
         ctx.strokeStyle = "#ffd66b";
         ctx.lineWidth = 3;
@@ -2538,6 +2743,15 @@
       ctx.moveTo(player.x, player.y);
       ctx.lineTo(player.x + Math.cos(angle) * 28, player.y + Math.sin(angle) * 28);
       ctx.stroke();
+      if (player.tool === 6 && state.flashlightTimer > 0) {
+        ctx.strokeStyle = "rgba(246, 241, 223, .72)";
+        ctx.lineWidth = 20;
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(player.x + Math.cos(angle) * 250, player.y + Math.sin(angle) * 250);
+        ctx.stroke();
+      }
+      if (player.carrying === "barrel") drawFuelBarrel(player.x, player.y - 28, .7);
     }
 
     function drawLighting(w, h) {
@@ -2581,9 +2795,10 @@
         ammo: 12,
         reserveAmmo: 36,
         rockets: 0,
+        carrying: null,
         coins: 5,
-        inv: { wood: 0, rawFood: 1, cookedFood: 2, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
-        builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0 },
+        inv: { wood: 0, rawFood: 1, cookedFood: 2, stew: 0, herbs: 0, scrap: 0, fuel: 0, gems: 0, med: 1, pelts: 0 },
+        builds: { walls: 0, traps: 0, foodGen: 0, oilRig: 0, sentry: 0, pot: 0 },
         upgrades: { axe: 0, pistol: 0, pack: 0, fire: 0, sentry: 0 }
       });
       Object.assign(state, {
@@ -2597,6 +2812,7 @@
         spawnTimer: 0,
         traderTimer: 18,
         nextPeltTraderDay: 3,
+        bossSpawnedDay: 0,
         buildOpen: false,
         tradeOpen: false,
         activeTrader: null,
@@ -2604,8 +2820,12 @@
         activeChest: null,
         generatorTimer: 20,
         sentryTimer: 0,
+        oilTimer: 28,
         cooking: false,
         cookingTimer: 0,
+        cookingTotal: 2.8,
+        cookingKind: "meat",
+        flashlightTimer: 0,
         messageTimer: 3,
         message: "Stay close to the campfire to heal.",
         logs: ["Welcome to the woods."],
@@ -2618,8 +2838,10 @@
       camp.r = 135;
       for (const location of locations) location.searchedDay = 0;
       zombies.length = 0;
+      bosses.length = 0;
       bullets.length = 0;
       rockets.length = 0;
+      barrels.length = 0;
       drops.length = 0;
       traders.length = 0;
       chests.length = 0;
